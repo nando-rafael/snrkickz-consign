@@ -44,18 +44,29 @@ export type Payout = {
   paid_at: string | null;
 };
 
+export type Inventory = {
+  id: number;
+  sku: string;
+  product_title: string;
+  size: string;
+  quantity: number;
+  created_at: string;
+};
+
 type Store = {
   consigners: Consigner[];
   listings: Listing[];
   payouts: Payout[];
-  nextId: { consigner: number; listing: number; payout: number };
+  inventory: Inventory[];
+  nextId: { consigner: number; listing: number; payout: number; inventory: number };
 };
 
 const empty: Store = {
   consigners: [],
   listings: [],
   payouts: [],
-  nextId: { consigner: 1, listing: 1, payout: 1 },
+  inventory: [],
+  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1 },
 };
 
 function load(): Store {
@@ -67,7 +78,8 @@ function load(): Store {
       consigners: parsed.consigners ?? [],
       listings: parsed.listings ?? [],
       payouts: parsed.payouts ?? [],
-      nextId: parsed.nextId ?? { consigner: 1, listing: 1, payout: 1 },
+      inventory: parsed.inventory ?? [],
+      nextId: parsed.nextId ?? { consigner: 1, listing: 1, payout: 1, inventory: 1 },
     };
   } catch {
     return JSON.parse(JSON.stringify(empty));
@@ -186,6 +198,41 @@ export const listingsTable = {
     const l = store.listings.find((x) => x.id === id);
     if (!l) return;
     l.status = "DELISTED";
+    save(store);
+  },
+};
+
+// ── Inventory ────────────────────────────────────────────────
+export const inventoryTable = {
+  listAll(): Inventory[] {
+    return getStore()
+      .inventory.slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  findById(id: number): Inventory | undefined {
+    return getStore().inventory.find((i) => i.id === id);
+  },
+  insert(input: Omit<Inventory, "id" | "created_at">): Inventory {
+    const store = getStore();
+    const row: Inventory = {
+      id: store.nextId.inventory++,
+      ...input,
+      created_at: now(),
+    };
+    store.inventory.push(row);
+    save(store);
+    return row;
+  },
+  updateQuantity(id: number, newQuantity: number): void {
+    const store = getStore();
+    const item = store.inventory.find((i) => i.id === id);
+    if (!item) return;
+    item.quantity = newQuantity;
+    save(store);
+  },
+  delete(id: number): void {
+    const store = getStore();
+    store.inventory = store.inventory.filter((i) => i.id !== id);
     save(store);
   },
 };
