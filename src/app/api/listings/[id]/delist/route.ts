@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { redirectTo } from "@/lib/url";
 import { listingsTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
 import { adjustInventory } from "@/lib/shopify";
@@ -9,7 +10,7 @@ export const runtime = "nodejs";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession();
-  if (!session) return NextResponse.redirect(new URL("/login", req.url), 303);
+  if (!session) return NextResponse.redirect(redirectTo(req, "/login"), 303);
 
   const listing = listingsTable.findById(Number(params.id));
   const admin = isAdmin(session.email);
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Niet gevonden" }, { status: 404 });
   }
   if (listing.status !== "ACTIVE") {
-    return NextResponse.redirect(new URL(admin ? "/admin" : "/dashboard", req.url), 303);
+    return NextResponse.redirect(redirectTo(req, admin ? "/admin" : "/dashboard"), 303);
   }
 
   try {
@@ -27,5 +28,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } catch (e: any) {
     return NextResponse.json({ error: `Delisten mislukt: ${e.message}` }, { status: 502 });
   }
-  return NextResponse.redirect(new URL(admin ? "/admin" : "/dashboard", req.url), 303);
+  return NextResponse.redirect(redirectTo(req, admin ? "/admin" : "/dashboard"), 303);
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { redirectTo } from "@/lib/url";
 import { payoutsTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
 
@@ -11,5 +12,5 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
   }
   payoutsTable.markPaid(Number(params.id));
-  return NextResponse.redirect(new URL("/admin", req.url), 303);
+  return NextResponse.redirect(redirectTo(req, "/admin"), 303);
 }

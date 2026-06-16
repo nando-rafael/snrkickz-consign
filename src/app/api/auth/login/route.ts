@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { redirectTo } from "@/lib/url";
 import bcrypt from "bcryptjs";
 import { consignersTable } from "@/lib/db";
 import { createSession } from "@/lib/auth";
@@ -24,5 +25,5 @@ export async function POST(req: NextRequest) {
   }
 
   await createSession({ id: user.id, email: user.email, name: user.name });
-  return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+  return NextResponse.redirect(redirectTo(req, "/dashboard"), 303);
 }

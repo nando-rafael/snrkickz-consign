@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { redirectTo } from "@/lib/url";
 import bcrypt from "bcryptjs";
 import { consignersTable } from "@/lib/db";
 import { createSession } from "@/lib/auth";
@@ -14,8 +15,7 @@ export async function POST(req: NextRequest) {
   const iban = String(form.get("iban") || "").trim() || null;
 
   const fail = (msg: string) =>
-    NextResponse.redirect(
-      new URL(`/register?error=${encodeURIComponent(msg)}`, req.url),
+    NextResponse.redirect(redirectTo(req, `/register?error=${encodeURIComponent(msg)}`),
       303
     );
 
@@ -35,5 +35,5 @@ export async function POST(req: NextRequest) {
   });
 
   await createSession({ id: row.id, email, name });
-  return NextResponse.redirect(new URL("/dashboard", req.url), 303);
+  return NextResponse.redirect(redirectTo(req, "/dashboard"), 303);
 }
