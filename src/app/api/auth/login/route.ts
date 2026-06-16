@@ -16,10 +16,7 @@ export async function POST(req: NextRequest) {
 
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return NextResponse.redirect(
-      new URL(
-        `/login?error=${encodeURIComponent("Onjuiste inloggegevens.")}`,
-        req.url
-      ),
+      redirectTo(req, `/login?error=${encodeURIComponent("Onjuiste inloggegevens.")}`),
       303
     );
   }
