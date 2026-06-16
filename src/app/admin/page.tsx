@@ -79,12 +79,13 @@ export default async function AdminPage() {
       <div className="table-wrap">
         {listings.length === 0 ? <div className="empty">Nog geen listings.</div> : (
           <table>
-            <thead><tr><th>Product</th><th>SKU</th><th>Consigner</th><th>Payout</th><th>Verkoop</th><th>Marge</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Product</th><th>SKU</th><th>Maat</th><th>Consigner</th><th>Payout</th><th>Verkoop</th><th>Marge</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {listings.map((l) => (
                 <tr key={l.id}>
                   <td><div className="prod">{l.product_image && <img src={l.product_image} alt="" />}<span className="t">{l.product_title}</span></div></td>
                   <td><span className="sku">{l.sku}</span></td>
+                  <td><span className="size-chip">{l.size}</span></td>
                   <td>{l.consigner_name}</td>
                   <td className="num">{euro(l.payout)}</td>
                   <td className="num">{euro(l.sale_price)}</td>
