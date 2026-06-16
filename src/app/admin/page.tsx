@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
-import { listingsTable, payoutsTable, consignersTable } from "@/lib/db";
+import { listingsTable, payoutsTable, consignersTable, inventoryTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
 import { euro, feePct } from "@/lib/config";
+import InventorySection from "./InventorySection";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,8 @@ export default async function AdminPage() {
     };
   });
 
+  const inventory = inventoryTable.listAll();
+
   const active = listings.filter((l) => l.status === "ACTIVE");
   const sold = listings.filter((l) => l.status === "SOLD");
   const pendingPayouts = payouts.filter((p) => p.status === "PENDING");
@@ -48,6 +51,8 @@ export default async function AdminPage() {
         <div className="stat"><div className="label">Fee verdiend</div><div className="value">{euro(feeEarned)}</div></div>
         <div className="stat"><div className="label">Uit te betalen</div><div className="value">{euro(pendingSum)}</div></div>
       </div>
+
+      <InventorySection initialItems={inventory} />
 
       <h2 className="section-title">Openstaande uitbetalingen ({pendingPayouts.length})</h2>
       <div className="table-wrap">
