@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { listingsTable, payoutsTable, consignersTable } from "@/lib/db";
+import { listingsTable, payoutsTable, consignersTable, notificationsTable } from "@/lib/db";
 import { recalcVariantPrice } from "@/lib/pricing";
 import { sendSoldNotification } from "@/lib/email";
 
@@ -65,6 +65,19 @@ export async function POST(req: NextRequest) {
         }
       } catch (emailErr) {
         console.error(`Failed to send sold notification for listing ${listing.id}:`, emailErr);
+      }
+
+      try {
+        const product = listing.product_title ?? listing.sku;
+        const price = `€${listing.sale_price.toLocaleString("nl-NL")}`;
+        notificationsTable.insert({
+          consigner_id: listing.consigner_id,
+          listing_id: listing.id,
+          type: "SOLD",
+          message: `Je ${product} (maat ${listing.size}) is verkocht voor ${price}`,
+        });
+      } catch (notifErr) {
+        console.error(`Failed to create notification for listing ${listing.id}:`, notifErr);
       }
     }
   }
