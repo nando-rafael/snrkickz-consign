@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { listingsTable, payoutsTable } from "@/lib/db";
+import { listingsTable, payoutsTable, consignersTable } from "@/lib/db";
 import { recalcVariantPrice } from "@/lib/pricing";
+import { sendSoldNotification } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +48,24 @@ export async function POST(req: NextRequest) {
       });
       touchedVariants.add(variantGid);
       matched++;
+
+      try {
+        const consigner = consignersTable.findById(listing.consigner_id);
+        if (consigner) {
+          await sendSoldNotification(
+            consigner.email,
+            consigner.name,
+            listing.product_title ?? listing.sku,
+            listing.sku,
+            listing.size,
+            listing.sale_price,
+            listing.payout,
+            orderName
+          );
+        }
+      } catch (emailErr) {
+        console.error(`Failed to send sold notification for listing ${listing.id}:`, emailErr);
+      }
     }
   }
 
