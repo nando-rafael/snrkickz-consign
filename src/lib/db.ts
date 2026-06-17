@@ -53,12 +53,23 @@ export type Inventory = {
   created_at: string;
 };
 
+export type Notification = {
+  id: number;
+  consigner_id: number;
+  listing_id: number;
+  type: "SOLD";
+  message: string;
+  read: boolean;
+  created_at: string;
+};
+
 type Store = {
   consigners: Consigner[];
   listings: Listing[];
   payouts: Payout[];
   inventory: Inventory[];
-  nextId: { consigner: number; listing: number; payout: number; inventory: number };
+  notifications: Notification[];
+  nextId: { consigner: number; listing: number; payout: number; inventory: number; notification: number };
 };
 
 const empty: Store = {
@@ -66,7 +77,8 @@ const empty: Store = {
   listings: [],
   payouts: [],
   inventory: [],
-  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1 },
+  notifications: [],
+  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1, notification: 1 },
 };
 
 function load(): Store {
@@ -79,7 +91,8 @@ function load(): Store {
       listings: parsed.listings ?? [],
       payouts: parsed.payouts ?? [],
       inventory: parsed.inventory ?? [],
-      nextId: parsed.nextId ?? { consigner: 1, listing: 1, payout: 1, inventory: 1 },
+      notifications: parsed.notifications ?? [],
+      nextId: parsed.nextId ?? { consigner: 1, listing: 1, payout: 1, inventory: 1, notification: 1 },
     };
   } catch {
     return JSON.parse(JSON.stringify(empty));
@@ -233,6 +246,39 @@ export const inventoryTable = {
   delete(id: number): void {
     const store = getStore();
     store.inventory = store.inventory.filter((i) => i.id !== id);
+    save(store);
+  },
+};
+
+// ── Notifications ────────────────────────────────────────────
+export const notificationsTable = {
+  insert(input: Omit<Notification, "id" | "read" | "created_at">): Notification {
+    const store = getStore();
+    const row: Notification = {
+      id: store.nextId.notification++,
+      ...input,
+      read: false,
+      created_at: now(),
+    };
+    store.notifications.push(row);
+    save(store);
+    return row;
+  },
+  listByConsigner(consignerId: number): Notification[] {
+    return getStore()
+      .notifications.filter((n) => n.consigner_id === consignerId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  markAsRead(id: number): void {
+    const store = getStore();
+    const n = store.notifications.find((x) => x.id === id);
+    if (!n) return;
+    n.read = true;
+    save(store);
+  },
+  delete(id: number): void {
+    const store = getStore();
+    store.notifications = store.notifications.filter((n) => n.id !== id);
     save(store);
   },
 };
