@@ -116,37 +116,90 @@ function mapVariant(n: any): ShopifyVariant {
 }
 
 /**
- * Zoekt een product op basis-SKU (stylecode). In de Snrkickz catalogus delen
- * alle maten van een product dezelfde SKU; de maat staat in de variant-titel.
- * Geeft het product terug met al zijn maten.
+ * Zoekt een product op SKU, stylecode of productnaam. Probeert eerst een
+ * exacte SKU-match; als dat niets oplevert wordt er gezocht op producttitel
+ * (gedeeltelijke match, hoofdletterongevoelig). Geeft het eerste gevonden
+ * product terug met al zijn maten.
  */
-export async function findProductBySku(
-  baseSku: string
+export async function findProduct(
+  searchTerm: string
 ): Promise<ShopifyProductMatch | null> {
-  const data = await shopifyGraphQL(
+  // 1. Probeer exacte SKU-match (huidig gedrag)
+  const skuData = await shopifyGraphQL(
     `query ($q: String!) {
       productVariants(first: 100, query: $q) {
         nodes { ${VARIANT_FIELDS} }
       }
     }`,
-    { q: `sku:${baseSku}` }
+    { q: `sku:${searchTerm}` }
   );
-  const nodes: any[] = (data?.productVariants?.nodes ?? []).filter(
-    (n: any) => (n.sku || "").toUpperCase() === baseSku.toUpperCase()
+  const skuNodes: any[] = (skuData?.productVariants?.nodes ?? []).filter(
+    (n: any) => (n.sku || "").toUpperCase() === searchTerm.toUpperCase()
   );
-  if (nodes.length === 0) return null;
 
-  const product = nodes[0].product;
-  // Alleen variants van hetzelfde product (voor het geval een SKU dubbel voorkomt)
-  const sameProduct = nodes.filter((n) => n.product?.id === product?.id);
+  if (skuNodes.length > 0) {
+    const product = skuNodes[0].product;
+    const sameProduct = skuNodes.filter((n) => n.product?.id === product?.id);
+    return {
+      productId: product?.id,
+      productTitle: product?.title,
+      imageUrl: product?.featuredMedia?.preview?.image?.url ?? null,
+      sku: skuNodes[0].sku,
+      variants: sameProduct.map(mapVariant),
+    };
+  }
+
+  // 2. Geen SKU-match — zoek op producttitel
+  const titleData = await shopifyGraphQL(
+    `query ($q: String!) {
+      products(first: 1, query: $q) {
+        nodes {
+          id
+          title
+          featuredMedia { preview { image { url } } }
+          variants(first: 100) {
+            nodes {
+              id
+              sku
+              title
+              price
+              inventoryQuantity
+              inventoryItem { id }
+            }
+          }
+        }
+      }
+    }`,
+    { q: `title:*${searchTerm}*` }
+  );
+  const products: any[] = titleData?.products?.nodes ?? [];
+  if (products.length === 0) return null;
+
+  const p = products[0];
+  const variantNodes: any[] = p.variants?.nodes ?? [];
+  if (variantNodes.length === 0) return null;
 
   return {
-    productId: product?.id,
-    productTitle: product?.title,
-    imageUrl: product?.featuredMedia?.preview?.image?.url ?? null,
-    sku: nodes[0].sku,
-    variants: sameProduct.map(mapVariant),
+    productId: p.id,
+    productTitle: p.title,
+    imageUrl: p.featuredMedia?.preview?.image?.url ?? null,
+    sku: variantNodes[0].sku ?? "",
+    variants: variantNodes.map((n: any) => ({
+      id: n.id,
+      sku: n.sku,
+      size: n.title,
+      price: n.price,
+      inventoryQuantity: n.inventoryQuantity ?? 0,
+      inventoryItemId: n.inventoryItem?.id,
+    })),
   };
+}
+
+/** @deprecated Gebruik findProduct() */
+export async function findProductBySku(
+  baseSku: string
+): Promise<ShopifyProductMatch | null> {
+  return findProduct(baseSku);
 }
 
 /** Haalt een specifieke variant op via GID, met productinfo. */

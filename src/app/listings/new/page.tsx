@@ -20,7 +20,7 @@ type Product = {
 
 export default function NewListing() {
   const router = useRouter();
-  const [styleCode, setStyleCode] = useState("");
+  const [query, setQuery] = useState("");
   const [product, setProduct] = useState<Product | null>(null);
   const [variantId, setVariantId] = useState("");
   const [payout, setPayout] = useState("");
@@ -40,13 +40,13 @@ export default function NewListing() {
     setError(null);
     setProduct(null);
     setVariantId("");
-    if (!styleCode.trim()) {
-      setError("Vul een stylecode in.");
+    if (!query.trim()) {
+      setError("Vul een stylecode, SKU of productnaam in.");
       return;
     }
     setLoading(true);
     try {
-      const params = new URLSearchParams({ styleCode });
+      const params = new URLSearchParams({ query });
       const res = await fetch(`/api/lookup?${params}`);
       const data = await res.json();
       if (!res.ok) {
@@ -79,7 +79,7 @@ export default function NewListing() {
       const res = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ variantId, styleCode, payout: payoutNum }),
+        body: JSON.stringify({ variantId, styleCode: product?.sku, payout: payoutNum }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -102,20 +102,19 @@ export default function NewListing() {
           Nieuwe listing
         </h1>
         <p className="page-sub" style={{ marginBottom: 24 }}>
-          Zoek het product op stylecode — de maten komen direct uit de store.
+          Zoek op stylecode, SKU of productnaam — de maten komen direct uit de store.
         </p>
 
         {error && <div className="error">{error}</div>}
 
         <div className="field">
-          <label htmlFor="styleCode">Stylecode / SKU</label>
+          <label htmlFor="query">Stylecode, SKU of productnaam</label>
           <div style={{ display: "flex", gap: 10 }}>
             <input
-              id="styleCode"
-              className="mono"
-              placeholder="KH7719"
-              value={styleCode}
-              onChange={(e) => setStyleCode(e.target.value)}
+              id="query"
+              placeholder="KH7719 of Air Max 90"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && lookup()}
             />
             <button
@@ -129,8 +128,7 @@ export default function NewListing() {
             </button>
           </div>
           <p className="hint">
-            De stylecode staat op de doos en in het label (bijv. KH7719 of
-            YS-01-WHITE).
+            Zoek op stylecode (bijv. KH7719), SKU of een deel van de productnaam.
           </p>
         </div>
 
