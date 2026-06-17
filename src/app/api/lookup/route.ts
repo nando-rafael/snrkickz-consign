@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { findProductBySku } from "@/lib/shopify";
+import { findProduct } from "@/lib/shopify";
 import { feePct } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -13,21 +13,23 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url);
-  const styleCode = (searchParams.get("styleCode") || "")
+  const query = (searchParams.get("query") || "")
     .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "");
+    .replace(/\s+/g, " ");
 
-  if (!styleCode) {
-    return NextResponse.json({ error: "Vul een stylecode in" }, { status: 400 });
+  if (!query) {
+    return NextResponse.json(
+      { error: "Zoek op stylecode, SKU of productnaam" },
+      { status: 400 }
+    );
   }
 
   try {
-    const product = await findProductBySku(styleCode);
+    const product = await findProduct(query);
     if (!product) {
       return NextResponse.json(
         {
-          error: `Geen product gevonden met stylecode ${styleCode}. Check de code, of het product staat nog niet in de store.`,
+          error: `Geen product gevonden voor "${query}". Controleer de stylecode, SKU of productnaam.`,
         },
         { status: 404 }
       );
