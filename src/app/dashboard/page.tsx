@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { listingsTable, payoutsTable, notificationsTable } from "@/lib/db";
+import { listingsTable, payoutsTable } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { euro } from "@/lib/config";
-import NotificationBox from "./NotificationBox";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +11,6 @@ export default async function Dashboard() {
 
   const listings = listingsTable.listByConsigner(session.id);
   const payouts = payoutsTable.listByConsigner(session.id);
-  const notifications = notificationsTable.listByConsigner(session.id).filter((n) => !n.read);
 
   const active = listings.filter((l) => l.status === "ACTIVE");
   const sold = listings.filter((l) => l.status === "SOLD");
@@ -28,8 +26,6 @@ export default async function Dashboard() {
         </div>
         <a href="/listings/new" className="btn">+ Nieuwe listing</a>
       </div>
-
-      <NotificationBox initialNotifications={notifications} />
 
       <div className="stats">
         <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
