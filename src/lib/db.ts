@@ -137,6 +137,11 @@ export const consignersTable = {
     save(store);
     return row;
   },
+  listAll(): Consigner[] {
+    return getStore()
+      .consigners.slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
 };
 
 // ── Listings ─────────────────────────────────────────────────
