@@ -45,6 +45,16 @@ export default async function RegisterPage({
             <p className="hint">Minimaal 8 tekens</p>
           </div>
           <div className="field">
+            <label htmlFor="discord_username">Discord gebruikersnaam</label>
+            <input 
+              id="discord_username" 
+              name="discord_username" 
+              type="text" 
+              placeholder="bijv. nando_rafael"
+            />
+            <p className="hint">Voor verkoopnotificaties in Discord</p>
+          </div>
+          <div className="field">
             <label htmlFor="iban">IBAN (voor uitbetalingen)</label>
             <input id="iban" name="iban" type="text" className="mono" placeholder="NL00 BANK 0000 0000 00" />
           </div>
@@ -59,3 +69,4 @@ export default async function RegisterPage({
     </main>
   );
 }
+

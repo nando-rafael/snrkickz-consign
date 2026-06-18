@@ -24,7 +24,10 @@ export default async function Dashboard() {
           <h1 className="page-title">Hey {session.name.split(" ")[0]}</h1>
           <p className="page-sub">Jouw consignment overzicht</p>
         </div>
-        <a href="/listings/new" className="btn">+ Nieuwe listing</a>
+        <div style={{ display: "flex", gap: 8 }}>
+          <a href="/dashboard/settings" className="btn">⚙️ Instellingen</a>
+          <a href="/listings/new" className="btn">+ Nieuwe listing</a>
+        </div>
       </div>
 
       <div className="stats">
@@ -88,3 +91,4 @@ export default async function Dashboard() {
     </main>
   );
 }
+

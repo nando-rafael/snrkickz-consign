@@ -10,6 +10,8 @@ export type Consigner = {
   name: string;
   password_hash: string;
   iban: string | null;
+  discord_username: string | null;
+  discord_webhook_url: string | null;
   created_at: string;
 };
 
@@ -124,6 +126,14 @@ export const consignersTable = {
       created_at: now(),
     };
     store.consigners.push(row);
+    save(store);
+    return row;
+  },
+  update(id: number, input: Partial<Omit<Consigner, "id" | "created_at">>): Consigner | undefined {
+    const store = getStore();
+    const row = store.consigners.find((c) => c.id === id);
+    if (!row) return undefined;
+    Object.assign(row, input);
     save(store);
     return row;
   },
@@ -280,3 +290,4 @@ export const payoutsTable = {
     save(store);
   },
 };
+

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { listingsTable, payoutsTable } from "@/lib/db";
+import { listingsTable, payoutsTable, consignersTable } from "@/lib/db";
 import { recalcVariantPrice } from "@/lib/pricing";
+import { sendDiscordNotification } from "@/lib/discord";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
 
   let matched = 0;
   const touchedVariants = new Set<string>();
+  const discordNotifications: Array<{ consignerId: number; listing: any; orderName: string }> = [];
 
   for (const li of lineItems) {
     if (!li?.variant_id) continue;
@@ -47,6 +49,13 @@ export async function POST(req: NextRequest) {
       });
       touchedVariants.add(variantGid);
       matched++;
+      
+      // Queue Discord notification
+      discordNotifications.push({
+        consignerId: listing.consigner_id,
+        listing,
+        orderName,
+      });
     }
   }
 
@@ -55,5 +64,18 @@ export async function POST(req: NextRequest) {
     catch (e) { console.error(`Prijsherstel mislukt voor ${v}:`, e); }
   }
 
+  // Send Discord notifications
+  for (const notif of discordNotifications) {
+    const consigner = consignersTable.findById(notif.consignerId);
+    if (consigner?.discord_webhook_url) {
+      await sendDiscordNotification(
+        consigner.discord_webhook_url,
+        notif.listing,
+        notif.orderName
+      );
+    }
+  }
+
   return NextResponse.json({ ok: true, matched });
 }
+
