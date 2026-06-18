@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listingsTable } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { adjustInventory, getVariantById } from "@/lib/shopify";
+import { adjustInventory, addProductToCollection, getVariantById } from "@/lib/shopify";
 import { computeSalePrice } from "@/lib/config";
 import { recalcVariantPrice } from "@/lib/pricing";
 
@@ -62,6 +62,16 @@ async function processSingleListing(
   });
 
   await recalcVariantPrice(variant.id);
+
+  try {
+    const collectionId = process.env.CONSIGN_COLLECTION_ID;
+    if (collectionId) {
+      await addProductToCollection(variant.productId, collectionId);
+    }
+  } catch (e: any) {
+    console.error(`Failed to add product to collection: ${e.message}`);
+    // Don't throw — listing is already created
+  }
 
   return { ok: true, id: row.id, sku: variant.sku, size: variant.size, salePrice };
 }

@@ -298,3 +298,23 @@ export async function setVariantPrice(
     throw new Error(errs.map((e: any) => e.message).join("; "));
   }
 }
+
+export async function addProductToCollection(
+  productId: string,
+  collectionId: string
+): Promise<void> {
+  const data = await shopifyGraphQL(
+    `mutation ($collectionId: ID!, $productIds: [ID!]!) {
+      collectionAddProducts(collectionId: $collectionId, productIds: $productIds) {
+        userErrors { field message }
+      }
+    }`,
+    { collectionId, productIds: [productId] }
+  );
+  const errs = data?.collectionAddProducts?.userErrors ?? [];
+  if (errs.length) {
+    console.error(
+      `addProductToCollection userErrors: ${errs.map((e: any) => e.message).join("; ")}`
+    );
+  }
+}
