@@ -39,28 +39,47 @@ export default function NewListing() {
   // Step 1: list of search results
   const [results, setResults] = useState<ProductResult[] | null>(null);
   const [feePct, setFeePct] = useState(0);
-  // Step 2: chosen product + size/payout
+  // Step 2: chosen product + per-size payouts
   const [product, setProduct] = useState<SelectedProduct | null>(null);
-  const [variantId, setVariantId] = useState("");
-  const [payout, setPayout] = useState("");
+  const [payouts, setPayouts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Success state
+  const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [failedItems, setFailedItems] = useState<{ variantId: string; error: string }[]>([]);
 
-  const payoutNum = parseFloat(payout) || 0;
-  const selected = product?.variants.find((v) => v.id === variantId) || null;
-  const salePrice =
-    payoutNum > 0 && product
-      ? Math.ceil(payoutNum / (1 - product.feePct / 100))
-      : null;
-  const tooHigh = selected !== null && payoutNum > selected.maxPayout;
+  /** Variants that have a valid payout entered */
+  const activeEntries =
+    product?.variants.flatMap((v) => {
+      const raw = payouts[v.id] ?? "";
+      const num = parseFloat(raw);
+      if (!raw || isNaN(num) || num <= 0) return [];
+      return [{ variant: v, payout: num }];
+    }) ?? [];
+
+  const listingCount = activeEntries.length;
+
+  /** True if any entered payout exceeds the variant's maxPayout */
+  const hasOverpay =
+    product?.variants.some((v) => {
+      const raw = payouts[v.id] ?? "";
+      const num = parseFloat(raw);
+      return raw && !isNaN(num) && num > v.maxPayout;
+    }) ?? false;
+
+  function calcSalePrice(payout: number): number {
+    if (!product) return 0;
+    return Math.ceil(payout / (1 - product.feePct / 100));
+  }
 
   async function lookup() {
     setError(null);
     setResults(null);
     setProduct(null);
-    setVariantId("");
-    setPayout("");
+    setPayouts({});
+    setSuccessCount(null);
+    setFailedItems([]);
     if (!query.trim()) {
       setError("Vul een stylecode, SKU of productnaam in.");
       return;
@@ -91,29 +110,29 @@ export default function NewListing() {
       feePct,
       variants: p.variants,
     });
-    setVariantId("");
-    setPayout("");
+    setPayouts({});
     setError(null);
+    setSuccessCount(null);
+    setFailedItems([]);
   }
 
   function backToResults() {
     setProduct(null);
-    setVariantId("");
-    setPayout("");
+    setPayouts({});
     setError(null);
+    setSuccessCount(null);
+    setFailedItems([]);
+  }
+
+  function setPayoutForVariant(variantId: string, value: string) {
+    setPayouts((prev) => ({ ...prev, [variantId]: value }));
   }
 
   async function submit() {
     setError(null);
-    if (!product || !selected) return;
-    if (!payoutNum || payoutNum <= 0) {
-      setError("Vul een geldige payout in.");
-      return;
-    }
-    if (tooHigh) {
-      setError(
-        `Payout te hoog voor deze maat. Maximaal €${selected.maxPayout}.`
-      );
+    if (!product || listingCount === 0) return;
+    if (hasOverpay) {
+      setError("Een of meer payouts zijn te hoog. Corrigeer de rood gemarkeerde velden.");
       return;
     }
     setSubmitting(true);
@@ -121,15 +140,37 @@ export default function NewListing() {
       const res = await fetch("/api/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ variantId, styleCode: product.sku, payout: payoutNum }),
+        body: JSON.stringify({
+          styleCode: product.sku,
+          listings: activeEntries.map(({ variant, payout }) => ({
+            variantId: variant.id,
+            payout,
+          })),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Plaatsen mislukt.");
         setSubmitting(false);
       } else {
-        router.push("/dashboard");
-        router.refresh();
+        const created: unknown[] = data.created ?? [];
+        const failed: { variantId: string; error: string }[] = data.failed ?? [];
+        if (created.length > 0) {
+          setSuccessCount(created.length);
+          setFailedItems(failed);
+          setPayouts({});
+          // Redirect after a short delay so the user sees the success message
+          setTimeout(() => {
+            router.push("/dashboard");
+            router.refresh();
+          }, 2200);
+        } else {
+          // All failed
+          setError(
+            failed.map((f) => f.error).join(" · ") || "Plaatsen mislukt."
+          );
+          setSubmitting(false);
+        }
       }
     } catch {
       setError("Netwerkfout. Probeer opnieuw.");
@@ -139,7 +180,10 @@ export default function NewListing() {
 
   return (
     <main className="page container">
-      <div className="card" style={{ maxWidth: 560, margin: "0 auto" }}>
+      <div
+        className="card"
+        style={{ maxWidth: product ? 720 : 560, margin: "0 auto", transition: "max-width 0.2s" }}
+      >
         <h1 className="page-title" style={{ marginBottom: 4 }}>
           Nieuwe listing
         </h1>
@@ -149,7 +193,31 @@ export default function NewListing() {
 
         {error && <div className="error">{error}</div>}
 
-        {/* ── Step 1: search bar (always visible) ── */}
+        {/* ── Success banner ── */}
+        {successCount !== null && (
+          <div
+            style={{
+              background: "rgba(111, 212, 154, 0.08)",
+              border: "1px solid rgba(111, 212, 154, 0.35)",
+              borderRadius: 8,
+              padding: "14px 16px",
+              marginBottom: 18,
+              color: "var(--green)",
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            ✓ {successCount} listing{successCount !== 1 ? "s" : ""} geplaatst — je wordt doorgestuurd…
+            {failedItems.length > 0 && (
+              <div style={{ marginTop: 8, fontWeight: 400, color: "#e8a0a0", fontSize: 13 }}>
+                {failedItems.length} maat/maten mislukt:{" "}
+                {failedItems.map((f) => f.error).join(" · ")}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 1: search bar (always visible when no product selected) ── */}
         {!product && (
           <div className="field">
             <label htmlFor="query">Stylecode, SKU of productnaam</label>
@@ -196,8 +264,8 @@ export default function NewListing() {
                     alignItems: "center",
                     gap: 12,
                     padding: "10px 12px",
-                    background: "var(--surface, #fff)",
-                    border: "1px solid var(--border, #e2e8f0)",
+                    background: "var(--panel-2)",
+                    border: "1px solid var(--line)",
                     borderRadius: 8,
                     cursor: "pointer",
                     textAlign: "left",
@@ -215,7 +283,7 @@ export default function NewListing() {
                         objectFit: "contain",
                         borderRadius: 4,
                         flexShrink: 0,
-                        background: "var(--surface-alt, #f8fafc)",
+                        background: "var(--bg)",
                       }}
                     />
                   ) : (
@@ -224,7 +292,7 @@ export default function NewListing() {
                         width: 56,
                         height: 56,
                         borderRadius: 4,
-                        background: "var(--surface-alt, #f8fafc)",
+                        background: "var(--bg)",
                         flexShrink: 0,
                       }}
                     />
@@ -243,7 +311,7 @@ export default function NewListing() {
                     >
                       {p.productTitle}
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--muted, #64748b)" }}>
+                    <div style={{ fontSize: 12, color: "var(--muted)" }}>
                       <span style={{ marginRight: 10 }}>SKU: {p.sku || "—"}</span>
                       <span>{p.variantCount} maten beschikbaar</span>
                     </div>
@@ -253,7 +321,7 @@ export default function NewListing() {
                     height="16"
                     viewBox="0 0 16 16"
                     fill="none"
-                    style={{ flexShrink: 0, color: "var(--muted, #94a3b8)" }}
+                    style={{ flexShrink: 0, color: "var(--muted)" }}
                   >
                     <path
                       d="M6 3l5 5-5 5"
@@ -269,76 +337,127 @@ export default function NewListing() {
           </div>
         )}
 
-        {/* ── Step 2: size + payout (after product is chosen) ── */}
-        {product && (
+        {/* ── Step 2: multi-size payout table ── */}
+        {product && successCount === null && (
           <>
-            <div className="preview">
+            {/* Product header */}
+            <div className="preview" style={{ marginBottom: 20 }}>
               {product.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={product.imageUrl} alt="" />
               )}
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="title">{product.productTitle}</div>
-                <div className="meta">
+                <div className="meta" style={{ marginTop: 4 }}>
                   <span className="sku">{product.sku}</span>
+                  <span style={{ marginLeft: 10 }}>
+                    Fee: {product.feePct}%
+                  </span>
                 </div>
               </div>
-              <div className="calc">
-                {salePrice && !tooHigh ? (
-                  <>
-                    <div className="sale">€{salePrice}</div>
-                    <div className="payout">jij ontvangt €{payoutNum}</div>
-                  </>
-                ) : (
-                  <div className="meta">Kies maat + payout</div>
-                )}
-              </div>
+              {listingCount > 0 && (
+                <div className="calc">
+                  <div className="sale">{listingCount}</div>
+                  <div className="payout">
+                    maat{listingCount !== 1 ? "en" : ""} geselecteerd
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="row">
-              <div className="field">
-                <label htmlFor="variant">Maat (EU)</label>
-                <select
-                  id="variant"
-                  value={variantId}
-                  onChange={(e) => setVariantId(e.target.value)}
-                >
-                  <option value="">Kies maat</option>
-                  {product.variants.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      EU {v.size} — max payout €{v.maxPayout}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="payout">Jouw payout (€)</label>
-                <input
-                  id="payout"
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder={selected ? `max ${selected.maxPayout}` : "—"}
-                  value={payout}
-                  onChange={(e) => setPayout(e.target.value)}
-                />
-              </div>
+            {/* Size table */}
+            <div className="table-wrap" style={{ marginBottom: 16 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Maat (EU)</th>
+                    <th className="num">Storeprijs</th>
+                    <th className="num">Max payout</th>
+                    <th className="num">Jouw payout (€)</th>
+                    <th className="num">Verkoopprijs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {product.variants.map((v) => {
+                    const raw = payouts[v.id] ?? "";
+                    const num = parseFloat(raw);
+                    const hasValue = raw !== "" && !isNaN(num) && num > 0;
+                    const overpay = hasValue && num > v.maxPayout;
+                    const salePrice = hasValue && !overpay ? calcSalePrice(num) : null;
+
+                    return (
+                      <tr key={v.id}>
+                        <td>
+                          <span className="size-chip">EU {v.size}</span>
+                        </td>
+                        <td className="num" style={{ color: "var(--muted)" }}>
+                          €{v.currentPrice}
+                        </td>
+                        <td className="num" style={{ color: "var(--muted)" }}>
+                          €{v.maxPayout}
+                        </td>
+                        <td className="num" style={{ width: 130 }}>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            placeholder="—"
+                            value={raw}
+                            onChange={(e) => setPayoutForVariant(v.id, e.target.value)}
+                            style={{
+                              textAlign: "right",
+                              padding: "7px 10px",
+                              fontSize: 13,
+                              borderColor: overpay
+                                ? "rgba(224, 112, 112, 0.7)"
+                                : undefined,
+                              background: overpay
+                                ? "rgba(224, 112, 112, 0.06)"
+                                : undefined,
+                            }}
+                          />
+                          {overpay && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "#e8a0a0",
+                                marginTop: 3,
+                                textAlign: "right",
+                              }}
+                            >
+                              max €{v.maxPayout}
+                            </div>
+                          )}
+                        </td>
+                        <td className="num">
+                          {salePrice ? (
+                            <span style={{ fontWeight: 700 }}>€{salePrice}</span>
+                          ) : (
+                            <span style={{ color: "var(--muted)" }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            {tooHigh && selected && (
-              <div className="error">
-                Payout te hoog — de storeprijs voor maat {selected.size} is €
-                {selected.currentPrice}. Maximale payout: €{selected.maxPayout}.
-              </div>
-            )}
+            <p className="hint" style={{ marginBottom: 16 }}>
+              Laat een veld leeg om die maat over te slaan. De verkoopprijs wordt live berekend.
+            </p>
 
             <button
               className="btn full"
               onClick={submit}
-              disabled={submitting || !selected || !salePrice || tooHigh}
+              disabled={submitting || listingCount === 0 || hasOverpay}
               type="button"
             >
-              {submitting ? "Plaatsen…" : "Plaats listing"}
+              {submitting
+                ? "Plaatsen…"
+                : listingCount === 0
+                ? "Vul minimaal één payout in"
+                : `Plaats ${listingCount} listing${listingCount !== 1 ? "s" : ""}`}
             </button>
 
             <button
