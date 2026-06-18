@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import { listingsTable, payoutsTable, consignersTable, inventoryTable } from "@/lib/db";
+import { listingsTable, payoutsTable, consignersTable, inventoryTable, productRequestsTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
 import { euro, feePct } from "@/lib/config";
 import InventorySection from "./InventorySection";
+import ProductRequestsSection from "./ProductRequestsSection";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,11 @@ export default async function AdminPage() {
   });
 
   const inventory = inventoryTable.listAll();
+
+  const allProductRequests = productRequestsTable.listAll().map((r) => {
+    const c = consignersTable.findById(r.consigner_id);
+    return { ...r, consigner_name: c?.name ?? "?", consigner_email: c?.email ?? "?" };
+  });
 
   const active = listings.filter((l) => l.status === "ACTIVE");
   const sold = listings.filter((l) => l.status === "SOLD");
@@ -63,6 +69,8 @@ export default async function AdminPage() {
         <div className="stat"><div className="label">Fee verdiend</div><div className="value">{euro(feeEarned)}</div></div>
         <div className="stat"><div className="label">Uit te betalen</div><div className="value">{euro(pendingSum)}</div></div>
       </div>
+
+      <ProductRequestsSection initialRequests={allProductRequests} />
 
       <h2 className="section-title">Consigners ({consigners.length})</h2>
       <div className="table-wrap">
