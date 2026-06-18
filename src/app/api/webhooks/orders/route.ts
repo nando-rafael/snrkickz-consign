@@ -19,27 +19,44 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
   if (!verifyHmac(rawBody, hmac)) {
+    console.error("[WEBHOOK] HMAC verification failed");
     return NextResponse.json({ error: "Ongeldige HMAC" }, { status: 401 });
   }
 
   let order: any;
   try { order = JSON.parse(rawBody); }
-  catch { return NextResponse.json({ error: "Ongeldige payload" }, { status: 400 }); }
+  catch { 
+    console.error("[WEBHOOK] Failed to parse JSON");
+    return NextResponse.json({ error: "Ongeldige payload" }, { status: 400 }); 
+  }
 
   const orderName: string = order?.name || `#${order?.order_number || "?"}`;
   const lineItems: any[] = order?.line_items || [];
+
+  console.log(`[WEBHOOK] Order received: ${orderName}`);
+  console.log(`[WEBHOOK] Line items count: ${lineItems.length}`);
 
   let matched = 0;
   const touchedVariants = new Set<string>();
   const discordNotifications: Array<{ consignerId: number; listing: any; orderName: string }> = [];
 
   for (const li of lineItems) {
-    if (!li?.variant_id) continue;
+    if (!li?.variant_id) {
+      console.log(`[WEBHOOK] Skipping line item - no variant_id`);
+      continue;
+    }
     const variantGid = `gid://shopify/ProductVariant/${li.variant_id}`;
     const qty: number = li?.quantity || 1;
+    
+    console.log(`[WEBHOOK] Processing variant: ${variantGid}, qty: ${qty}`);
+    
     for (let i = 0; i < qty; i++) {
       const listing = listingsTable.findActiveByVariantLowestPayout(variantGid);
-      if (!listing) break;
+      if (!listing) {
+        console.log(`[WEBHOOK] No active listing found for variant: ${variantGid}`);
+        break;
+      }
+      console.log(`[WEBHOOK] Found listing ID ${listing.id}, marking as sold`);
       listingsTable.markSold(listing.id, orderName);
       payoutsTable.insert({
         consigner_id: listing.consigner_id,
@@ -58,6 +75,8 @@ export async function POST(req: NextRequest) {
       });
     }
   }
+
+  console.log(`[WEBHOOK] Matched ${matched} listings`);
 
   for (const v of Array.from(touchedVariants)) {
     try { await recalcVariantPrice(v); }
@@ -78,4 +97,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, matched });
 }
-
