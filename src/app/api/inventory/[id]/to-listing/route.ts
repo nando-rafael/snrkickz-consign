@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { inventoryTable, listingsTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
-import { findProductBySku, adjustInventory } from "@/lib/shopify";
+import { findProductBySku, adjustInventory, addProductToCollection } from "@/lib/shopify";
 import { computeSalePrice } from "@/lib/config";
 import { recalcVariantPrice } from "@/lib/pricing";
 
@@ -79,6 +79,16 @@ export async function POST(
     });
 
     await recalcVariantPrice(variant.id);
+
+    try {
+      const collectionId = process.env.CONSIGN_COLLECTION_ID;
+      if (collectionId) {
+        await addProductToCollection(product.productId, collectionId);
+      }
+    } catch (e: any) {
+      console.error(`Failed to add product to collection: ${e.message}`);
+      // Don't throw — listing is already created
+    }
 
     // Remove from inventory (or decrement quantity if > 1)
     if (item.quantity > 1) {
