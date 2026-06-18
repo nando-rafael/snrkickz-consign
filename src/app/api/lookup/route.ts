@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { findProduct } from "@/lib/shopify";
+import { findProducts } from "@/lib/shopify";
 import { feePct } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const product = await findProduct(query);
-    if (!product) {
+    const matches = await findProducts(query);
+    if (matches.length === 0) {
       return NextResponse.json(
         {
           error: `Geen product gevonden voor "${query}". Controleer de stylecode, SKU of productnaam.`,
@@ -36,16 +36,20 @@ export async function GET(req: NextRequest) {
     }
     const fee = feePct();
     return NextResponse.json({
-      productTitle: product.productTitle,
-      imageUrl: product.imageUrl,
-      sku: product.sku,
       feePct: fee,
-      variants: product.variants.map((v) => ({
-        id: v.id,
-        size: v.size,
-        currentPrice: parseFloat(v.price),
-        // max payout zodat verkoopprijs nooit boven de storeprijs uitkomt
-        maxPayout: Math.floor(parseFloat(v.price) * (1 - fee / 100)),
+      products: matches.map((product) => ({
+        productId: product.productId,
+        productTitle: product.productTitle,
+        imageUrl: product.imageUrl,
+        sku: product.sku,
+        variantCount: product.variants.length,
+        variants: product.variants.map((v) => ({
+          id: v.id,
+          size: v.size,
+          currentPrice: parseFloat(v.price),
+          // max payout zodat verkoopprijs nooit boven de storeprijs uitkomt
+          maxPayout: Math.floor(parseFloat(v.price) * (1 - fee / 100)),
+        })),
       })),
     });
   } catch (e: any) {

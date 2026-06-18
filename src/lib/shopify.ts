@@ -124,7 +124,21 @@ function mapVariant(n: any): ShopifyVariant {
 export async function findProduct(
   searchTerm: string
 ): Promise<ShopifyProductMatch | null> {
-  // 1. Probeer exacte SKU-match (huidig gedrag)
+  const results = await findProducts(searchTerm);
+  return results.length > 0 ? results[0] : null;
+}
+
+/**
+ * Zoekt meerdere producten op SKU, stylecode of productnaam. Probeert eerst
+ * een exacte SKU-match; als dat niets oplevert wordt er gezocht op
+ * producttitel (gedeeltelijke match, hoofdletterongevoelig). Geeft alle
+ * gevonden producten terug met hun maten — zodat kleurvarianten als aparte
+ * producten getoond kunnen worden.
+ */
+export async function findProducts(
+  searchTerm: string
+): Promise<ShopifyProductMatch[]> {
+  // 1. Probeer exacte SKU-match
   const skuData = await shopifyGraphQL(
     `query ($q: String!) {
       productVariants(first: 100, query: $q) {
@@ -138,21 +152,29 @@ export async function findProduct(
   );
 
   if (skuNodes.length > 0) {
-    const product = skuNodes[0].product;
-    const sameProduct = skuNodes.filter((n) => n.product?.id === product?.id);
-    return {
-      productId: product?.id,
-      productTitle: product?.title,
-      imageUrl: product?.featuredMedia?.preview?.image?.url ?? null,
-      sku: skuNodes[0].sku,
-      variants: sameProduct.map(mapVariant),
-    };
+    // Groepeer op product-ID zodat elke kleurvariant apart terugkomt
+    const byProduct = new Map<string, any[]>();
+    for (const n of skuNodes) {
+      const pid = n.product?.id ?? "";
+      if (!byProduct.has(pid)) byProduct.set(pid, []);
+      byProduct.get(pid)!.push(n);
+    }
+    return Array.from(byProduct.values()).map((nodes) => {
+      const product = nodes[0].product;
+      return {
+        productId: product?.id,
+        productTitle: product?.title,
+        imageUrl: product?.featuredMedia?.preview?.image?.url ?? null,
+        sku: nodes[0].sku,
+        variants: nodes.map(mapVariant),
+      };
+    });
   }
 
-  // 2. Geen SKU-match — zoek op producttitel
+  // 2. Geen SKU-match — zoek op producttitel (tot 20 resultaten)
   const titleData = await shopifyGraphQL(
     `query ($q: String!) {
-      products(first: 1, query: $q) {
+      products(first: 20, query: $q) {
         nodes {
           id
           title
@@ -173,26 +195,28 @@ export async function findProduct(
     { q: `title:*${searchTerm}*` }
   );
   const products: any[] = titleData?.products?.nodes ?? [];
-  if (products.length === 0) return null;
+  if (products.length === 0) return [];
 
-  const p = products[0];
-  const variantNodes: any[] = p.variants?.nodes ?? [];
-  if (variantNodes.length === 0) return null;
-
-  return {
-    productId: p.id,
-    productTitle: p.title,
-    imageUrl: p.featuredMedia?.preview?.image?.url ?? null,
-    sku: variantNodes[0].sku ?? "",
-    variants: variantNodes.map((n: any) => ({
-      id: n.id,
-      sku: n.sku,
-      size: n.title,
-      price: n.price,
-      inventoryQuantity: n.inventoryQuantity ?? 0,
-      inventoryItemId: n.inventoryItem?.id,
-    })),
-  };
+  return products
+    .map((p: any) => {
+      const variantNodes: any[] = p.variants?.nodes ?? [];
+      if (variantNodes.length === 0) return null;
+      return {
+        productId: p.id,
+        productTitle: p.title,
+        imageUrl: p.featuredMedia?.preview?.image?.url ?? null,
+        sku: variantNodes[0].sku ?? "",
+        variants: variantNodes.map((n: any) => ({
+          id: n.id,
+          sku: n.sku,
+          size: n.title,
+          price: n.price,
+          inventoryQuantity: n.inventoryQuantity ?? 0,
+          inventoryItemId: n.inventoryItem?.id,
+        })),
+      } as ShopifyProductMatch;
+    })
+    .filter((p): p is ShopifyProductMatch => p !== null);
 }
 
 /** @deprecated Gebruik findProduct() */
