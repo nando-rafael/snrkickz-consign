@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { listingsTable, payoutsTable } from "@/lib/db";
+import { listingsTable, payoutsTable, productRequestsTable } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { euro } from "@/lib/config";
 
@@ -11,6 +11,7 @@ export default async function Dashboard() {
 
   const listings = listingsTable.listByConsigner(session.id);
   const payouts = payoutsTable.listByConsigner(session.id);
+  const productRequests = productRequestsTable.listByConsigner(session.id);
 
   const active = listings.filter((l) => l.status === "ACTIVE");
   const sold = listings.filter((l) => l.status === "SOLD");
@@ -88,7 +89,56 @@ export default async function Dashboard() {
           </table>
         )}
       </div>
+
+      <h2 className="section-title">Mijn product requests</h2>
+      <div className="table-wrap">
+        {productRequests.length === 0 ? (
+          <div className="empty">Je hebt nog geen product requests ingediend.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Productnaam</th>
+                <th>Status</th>
+                <th>Datum</th>
+              </tr>
+            </thead>
+            <tbody>
+              {productRequests.map((r) => (
+                <tr key={r.id}>
+                  <td><span className="sku">{r.sku}</span></td>
+                  <td>{r.product_name}</td>
+                  <td>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        background:
+                          r.status === "PENDING" ? "rgba(160,160,160,0.15)" :
+                          r.status === "APPROVED" ? "rgba(59,130,246,0.15)" :
+                          r.status === "LIVE" ? "rgba(111,212,154,0.15)" :
+                          "rgba(224,112,112,0.15)",
+                        color:
+                          r.status === "PENDING" ? "var(--muted)" :
+                          r.status === "APPROVED" ? "#60a5fa" :
+                          r.status === "LIVE" ? "var(--green)" :
+                          "#e87070",
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {r.status}
+                    </span>
+                  </td>
+                  <td>{r.created_at.slice(0, 10)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </main>
   );
 }
-

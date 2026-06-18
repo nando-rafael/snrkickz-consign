@@ -48,6 +48,14 @@ export default function NewListing() {
   // Success state
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const [failedItems, setFailedItems] = useState<{ variantId: string; error: string }[]>([]);
+  // Product request modal
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [reqSku, setReqSku] = useState("");
+  const [reqName, setReqName] = useState("");
+  const [reqUrl, setReqUrl] = useState("");
+  const [reqError, setReqError] = useState<string | null>(null);
+  const [reqSuccess, setReqSuccess] = useState(false);
+  const [reqSubmitting, setReqSubmitting] = useState(false);
 
   /** Variants that have a valid payout entered */
   const activeEntries =
@@ -89,7 +97,10 @@ export default function NewListing() {
       const params = new URLSearchParams({ query });
       const res = await fetch(`/api/lookup?${params}`);
       const data: LookupResponse & { error?: string } = await res.json();
-      if (!res.ok) {
+      if (res.status === 404) {
+        // No products found — show the "request product" prompt
+        setResults([]);
+      } else if (!res.ok) {
         setError(data.error || "Lookup mislukt.");
       } else {
         setFeePct(data.feePct);
@@ -175,6 +186,58 @@ export default function NewListing() {
     } catch {
       setError("Netwerkfout. Probeer opnieuw.");
       setSubmitting(false);
+    }
+  }
+
+  function openRequestModal() {
+    // Pre-fill SKU from the search query if it looks like a style code
+    setReqSku(query.trim().toUpperCase());
+    setReqName("");
+    setReqUrl("");
+    setReqError(null);
+    setReqSuccess(false);
+    setShowRequestModal(true);
+  }
+
+  function closeRequestModal() {
+    setShowRequestModal(false);
+    setReqError(null);
+    setReqSuccess(false);
+  }
+
+  async function submitRequest() {
+    setReqError(null);
+    const sku = reqSku.trim().toUpperCase();
+    const product_name = reqName.trim();
+    const stockx_url = reqUrl.trim();
+
+    if (!sku) { setReqError("SKU is verplicht"); return; }
+    if (!product_name) { setReqError("Productnaam is verplicht"); return; }
+    if (!stockx_url || !/^https:\/\/stockx\.com\//.test(stockx_url)) {
+      setReqError("Alleen StockX links worden geaccepteerd");
+      return;
+    }
+
+    setReqSubmitting(true);
+    try {
+      const res = await fetch("/api/product-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sku, product_name, stockx_url }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setReqError(data.error || "Aanvragen mislukt.");
+      } else {
+        setReqSuccess(true);
+        setTimeout(() => {
+          closeRequestModal();
+        }, 2000);
+      }
+    } catch {
+      setReqError("Netwerkfout. Probeer opnieuw.");
+    } finally {
+      setReqSubmitting(false);
     }
   }
 
@@ -333,6 +396,128 @@ export default function NewListing() {
                   </svg>
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 1c: no results — request product ── */}
+        {!product && results !== null && results.length === 0 && (
+          <div
+            style={{
+              marginTop: 16,
+              padding: "16px",
+              background: "var(--panel-2)",
+              border: "1px solid var(--line)",
+              borderRadius: 8,
+              textAlign: "center",
+            }}
+          >
+            <p style={{ marginBottom: 12, color: "var(--muted)", fontSize: 14 }}>
+              Geen producten gevonden voor &ldquo;{query}&rdquo;
+            </p>
+            <button
+              className="btn ghost"
+              type="button"
+              onClick={openRequestModal}
+            >
+              Product staat er niet bij? Vraag aan.
+            </button>
+          </div>
+        )}
+
+        {/* ── Product request modal ── */}
+        {showRequestModal && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 50,
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget) closeRequestModal(); }}
+          >
+            <div className="card" style={{ width: "100%", maxWidth: 460 }}>
+              <h2 className="page-title" style={{ fontSize: 17, marginBottom: 4 }}>
+                Product aanvragen
+              </h2>
+              <p className="page-sub" style={{ marginBottom: 20 }}>
+                Staat het product er niet bij? Vul de gegevens in en wij voegen het toe.
+              </p>
+
+              {reqSuccess ? (
+                <div
+                  style={{
+                    background: "rgba(111, 212, 154, 0.08)",
+                    border: "1px solid rgba(111, 212, 154, 0.35)",
+                    borderRadius: 8,
+                    padding: "14px 16px",
+                    color: "var(--green)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                  }}
+                >
+                  ✓ Product aangevraagd! Je krijgt bericht zodra het online staat.
+                </div>
+              ) : (
+                <>
+                  {reqError && <div className="error">{reqError}</div>}
+
+                  <div className="field">
+                    <label htmlFor="req-sku">SKU / Stylecode</label>
+                    <input
+                      id="req-sku"
+                      className="mono"
+                      placeholder="IB3801"
+                      value={reqSku}
+                      onChange={(e) => setReqSku(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="req-name">Productnaam</label>
+                    <input
+                      id="req-name"
+                      placeholder="Adidas Samba OG Cloud White"
+                      value={reqName}
+                      onChange={(e) => setReqName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="req-url">StockX link</label>
+                    <input
+                      id="req-url"
+                      type="url"
+                      placeholder="https://stockx.com/..."
+                      value={reqUrl}
+                      onChange={(e) => setReqUrl(e.target.value)}
+                    />
+                    <p className="hint">Alleen links die beginnen met https://stockx.com/</p>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      className="btn"
+                      type="button"
+                      onClick={submitRequest}
+                      disabled={reqSubmitting}
+                      style={{ flex: 1 }}
+                    >
+                      {reqSubmitting ? "Aanvragen…" : "Vraag product aan"}
+                    </button>
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      onClick={closeRequestModal}
+                    >
+                      Annuleer
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

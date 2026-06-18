@@ -55,12 +55,24 @@ export type Inventory = {
   created_at: string;
 };
 
+export type ProductRequest = {
+  id: number;
+  consigner_id: number;
+  sku: string;
+  product_name: string;
+  stockx_url: string;
+  status: "PENDING" | "APPROVED" | "LIVE" | "REJECTED";
+  created_at: string;
+  handled_at: string | null;
+};
+
 type Store = {
   consigners: Consigner[];
   listings: Listing[];
   payouts: Payout[];
   inventory: Inventory[];
-  nextId: { consigner: number; listing: number; payout: number; inventory: number };
+  productRequests: ProductRequest[];
+  nextId: { consigner: number; listing: number; payout: number; inventory: number; productRequest: number };
 };
 
 const empty: Store = {
@@ -68,7 +80,8 @@ const empty: Store = {
   listings: [],
   payouts: [],
   inventory: [],
-  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1 },
+  productRequests: [],
+  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1, productRequest: 1 },
 };
 
 function load(): Store {
@@ -81,7 +94,14 @@ function load(): Store {
       listings: parsed.listings ?? [],
       payouts: parsed.payouts ?? [],
       inventory: parsed.inventory ?? [],
-      nextId: parsed.nextId ?? { consigner: 1, listing: 1, payout: 1, inventory: 1 },
+      productRequests: parsed.productRequests ?? [],
+      nextId: {
+        consigner: parsed.nextId?.consigner ?? 1,
+        listing: parsed.nextId?.listing ?? 1,
+        payout: parsed.nextId?.payout ?? 1,
+        inventory: parsed.nextId?.inventory ?? 1,
+        productRequest: parsed.nextId?.productRequest ?? 1,
+      },
     };
   } catch {
     return JSON.parse(JSON.stringify(empty));
@@ -293,6 +313,55 @@ export const payoutsTable = {
     p.status = "PAID";
     p.paid_at = now();
     save(store);
+  },
+};
+
+// ── Product Requests ─────────────────────────────────────────
+export const productRequestsTable = {
+  insert(input: Omit<ProductRequest, "id" | "created_at" | "handled_at">): ProductRequest {
+    const store = getStore();
+    const row: ProductRequest = {
+      id: store.nextId.productRequest++,
+      ...input,
+      created_at: now(),
+      handled_at: null,
+    };
+    store.productRequests.push(row);
+    save(store);
+    return row;
+  },
+  findById(id: number): ProductRequest | undefined {
+    return getStore().productRequests.find((r) => r.id === id);
+  },
+  listByConsigner(consignerId: number): ProductRequest[] {
+    return getStore()
+      .productRequests.filter((r) => r.consigner_id === consignerId)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  listAll(): ProductRequest[] {
+    return getStore()
+      .productRequests.slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+  updateStatus(
+    id: number,
+    status: ProductRequest["status"],
+    handledAt: string
+  ): ProductRequest | undefined {
+    const store = getStore();
+    const row = store.productRequests.find((r) => r.id === id);
+    if (!row) return undefined;
+    row.status = status;
+    row.handled_at = handledAt;
+    save(store);
+    return row;
+  },
+  findBySku(sku: string): ProductRequest | undefined {
+    return getStore().productRequests.find(
+      (r) =>
+        r.sku.toUpperCase() === sku.toUpperCase() &&
+        (r.status === "PENDING" || r.status === "APPROVED")
+    );
   },
 };
 
