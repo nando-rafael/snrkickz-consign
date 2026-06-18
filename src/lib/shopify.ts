@@ -304,12 +304,12 @@ export async function addProductToCollection(
   collectionId: string
 ): Promise<void> {
   const data = await shopifyGraphQL(
-    `mutation ($collectionId: ID!, $productIds: [ID!]!) {
-      collectionAddProducts(collectionId: $collectionId, productIds: $productIds) {
+    `mutation ($id: ID!, $productIds: [ID!]!) {
+      collectionAddProducts(id: $id, productIds: $productIds) {
         userErrors { field message }
       }
     }`,
-    { collectionId, productIds: [productId] }
+    { id: collectionId, productIds: [productId] }
   );
   const errs = data?.collectionAddProducts?.userErrors ?? [];
   if (errs.length) {
