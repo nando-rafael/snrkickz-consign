@@ -11,7 +11,9 @@ export default async function AdminPage() {
   if (!session) redirect("/login");
   if (!isAdmin(session.email)) redirect("/dashboard");
 
-  const listings = listingsTable.listAll().map((l) => {
+  const allListings = listingsTable.listAll();
+
+  const listings = allListings.map((l) => {
     const c = consignersTable.findById(l.consigner_id);
     return { ...l, consigner_name: c?.name ?? "?", consigner_email: c?.email ?? "?" };
   });
@@ -37,6 +39,16 @@ export default async function AdminPage() {
   const pendingSum = pendingPayouts.reduce((s, p) => s + p.amount, 0);
   const feeEarned = sold.reduce((s, l) => s + (l.sale_price - l.payout), 0);
 
+  const consigners = consignersTable.listAll().map((c) => {
+    const cListings = allListings.filter((l) => l.consigner_id === c.id);
+    const activeCount = cListings.filter((l) => l.status === "ACTIVE").length;
+    const soldCount = cListings.filter((l) => l.status === "SOLD").length;
+    const pendingPayout = payouts
+      .filter((p) => p.consigner_id === c.id && p.status === "PENDING")
+      .reduce((s, p) => s + p.amount, 0);
+    return { ...c, activeCount, soldCount, pendingPayout };
+  });
+
   return (
     <main className="page container">
       <div className="page-head">
@@ -50,6 +62,44 @@ export default async function AdminPage() {
         <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
         <div className="stat"><div className="label">Fee verdiend</div><div className="value">{euro(feeEarned)}</div></div>
         <div className="stat"><div className="label">Uit te betalen</div><div className="value">{euro(pendingSum)}</div></div>
+      </div>
+
+      <h2 className="section-title">Consigners ({consigners.length})</h2>
+      <div className="table-wrap">
+        {consigners.length === 0 ? <div className="empty">Geen consigners gevonden.</div> : (
+          <table>
+            <thead>
+              <tr>
+                <th>Naam</th>
+                <th>Email</th>
+                <th>IBAN</th>
+                <th>Discord</th>
+                <th>Webhook URL</th>
+                <th>Live</th>
+                <th>Verkocht</th>
+                <th>Uitbetaling</th>
+              </tr>
+            </thead>
+            <tbody>
+              {consigners.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.name}</td>
+                  <td><span className="size-chip">{c.email}</span></td>
+                  <td><span className="size-chip">{c.iban || "—"}</span></td>
+                  <td><span className="size-chip">{c.discord_username || "—"}</span></td>
+                  <td>
+                    {c.discord_webhook_url
+                      ? <span className="size-chip" title={c.discord_webhook_url}>✓ ingesteld</span>
+                      : <span className="size-chip">—</span>}
+                  </td>
+                  <td className="num">{c.activeCount}</td>
+                  <td className="num">{c.soldCount}</td>
+                  <td className="num">{c.pendingPayout > 0 ? euro(c.pendingPayout) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <InventorySection initialItems={inventory} />
