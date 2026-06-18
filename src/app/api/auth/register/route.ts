@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
   const name = String(form.get("name") || "").trim();
   const email = String(form.get("email") || "").trim().toLowerCase();
   const password = String(form.get("password") || "");
+  const discord_username = String(form.get("discord_username") || "").trim() || null;
   const iban = String(form.get("iban") || "").trim() || null;
 
   const fail = (msg: string) =>
@@ -32,8 +33,11 @@ export async function POST(req: NextRequest) {
     name,
     password_hash: hash,
     iban,
+    discord_username,
+    discord_webhook_url: null,
   });
 
   await createSession({ id: row.id, email, name });
   return NextResponse.redirect(redirectTo(req, "/dashboard"), 303);
 }
+
