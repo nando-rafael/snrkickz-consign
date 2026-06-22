@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listingsTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
-import type { ShippingStatus } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const VALID_STATUSES: ShippingStatus[] = [
-  "LABEL_SENT",
-  "IN_TRANSIT",
-  "RECEIVED",
-  "SHIPPED_TO_CUSTOMER",
-];
 
 export async function POST(
   req: NextRequest,
@@ -34,22 +26,19 @@ export async function POST(
     return NextResponse.json({ error: "Ongeldige JSON" }, { status: 400 });
   }
 
-  const { status } = body as { status?: unknown };
+  const { labelUrl } = body as { labelUrl?: unknown };
 
-  if (!status || !VALID_STATUSES.includes(status as ShippingStatus)) {
-    return NextResponse.json(
-      { error: `Ongeldige status. Kies uit: ${VALID_STATUSES.join(", ")}` },
-      { status: 400 }
-    );
+  if (!labelUrl || typeof labelUrl !== "string" || !labelUrl.trim()) {
+    return NextResponse.json({ error: "labelUrl is verplicht" }, { status: 400 });
   }
 
   const updated = listingsTable.update(listing.id, {
-    shipping_status: status as ShippingStatus,
+    shipping_label_url: labelUrl.trim(),
   });
 
   if (!updated) {
     return NextResponse.json({ error: "Update mislukt" }, { status: 500 });
   }
 
-  return NextResponse.json({ listing: updated });
+  return NextResponse.json({ ok: true, labelUrl: updated.shipping_label_url });
 }
