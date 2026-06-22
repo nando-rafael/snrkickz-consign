@@ -28,6 +28,7 @@ export type Listing = {
   inventory_item_id: string | null;
   payout: number;
   sale_price: number;
+  sale_price_override: number | null;
   original_price: number | null;
   quantity: number;
   status: "ACTIVE" | "SOLD" | "DELISTED";
@@ -184,9 +185,18 @@ export const listingsTable = {
       sold_at: null,
       order_name: null,
       quantity: 1,
+      sale_price_override: null,
       ...input,
     };
     store.listings.push(row);
+    save(store);
+    return row;
+  },
+  update(id: number, input: Partial<Omit<Listing, "id" | "created_at">>): Listing | undefined {
+    const store = getStore();
+    const row = store.listings.find((l) => l.id === id);
+    if (!row) return undefined;
+    Object.assign(row, input);
     save(store);
     return row;
   },
