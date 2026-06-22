@@ -43,9 +43,7 @@ export default async function AdminPage() {
 
   const active = listings.filter((l) => l.status === "ACTIVE");
   const sold = listings.filter((l) => l.status === "SOLD");
-  const soldListings = listings.filter(
-    (l) => l.status === "SOLD" && (l.shipping_status !== null || l.status === "SOLD")
-  );
+  const soldListings = listings.filter((l) => l.status === "SOLD");
   const pendingPayouts = payouts.filter((p) => p.status === "PENDING");
   const pendingSum = pendingPayouts.reduce((s, p) => s + p.amount, 0);
   const feeEarned = sold.reduce((s, l) => s + (l.sale_price - l.payout), 0);
