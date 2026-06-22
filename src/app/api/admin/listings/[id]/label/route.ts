@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listingsTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
+import fs from "fs";
+import path from "path";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,21 +21,33 @@ export async function POST(
     return NextResponse.json({ error: "Listing niet gevonden" }, { status: 404 });
   }
 
-  let body: unknown;
+  let formData: FormData;
   try {
-    body = await req.json();
+    formData = await req.formData();
   } catch {
-    return NextResponse.json({ error: "Ongeldige JSON" }, { status: 400 });
+    return NextResponse.json({ error: "Ongeldige form data" }, { status: 400 });
   }
 
-  const { labelUrl } = body as { labelUrl?: unknown };
-
-  if (!labelUrl || typeof labelUrl !== "string" || !labelUrl.trim()) {
-    return NextResponse.json({ error: "labelUrl is verplicht" }, { status: 400 });
+  const file = formData.get("file");
+  if (!file || !(file instanceof Blob)) {
+    return NextResponse.json({ error: "Geen bestand gevonden" }, { status: 400 });
   }
+
+  if (file.type !== "application/pdf") {
+    return NextResponse.json({ error: "Alleen PDF bestanden zijn toegestaan" }, { status: 400 });
+  }
+
+  const filename = `listing-${listing.id}-${Date.now()}.pdf`;
+  const labelsDir = path.join(process.cwd(), "public", "labels");
+  fs.mkdirSync(labelsDir, { recursive: true });
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  fs.writeFileSync(path.join(labelsDir, filename), buffer);
+
+  const labelUrl = `/labels/${filename}`;
 
   const updated = listingsTable.update(listing.id, {
-    shipping_label_url: labelUrl.trim(),
+    shipping_label_url: labelUrl,
   });
 
   if (!updated) {
