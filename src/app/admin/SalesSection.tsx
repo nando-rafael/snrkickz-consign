@@ -23,8 +23,7 @@ function euro(n: number): string {
 export default function SalesSection({ initialListings }: Props) {
   const router = useRouter();
   const [listings, setListings] = useState<ListingWithConsigner[]>(initialListings);
-  const [labelInputId, setLabelInputId] = useState<number | null>(null);
-  const [labelInputValue, setLabelInputValue] = useState("");
+  const [labelInputs, setLabelInputs] = useState<Record<number, string>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -34,8 +33,9 @@ export default function SalesSection({ initialListings }: Props) {
   }
 
   async function saveLabel(listingId: number) {
-    const url = labelInputValue.trim();
+    const url = labelInputs[listingId]?.trim();
     if (!url) return;
+
     setSavingId(listingId);
     try {
       const res = await fetch(`/api/admin/listings/${listingId}/label`, {
@@ -49,106 +49,22 @@ export default function SalesSection({ initialListings }: Props) {
       } else {
         setListings((prev) =>
           prev.map((l) =>
-            l.id === listingId ? { ...l, shipping_label_url: data.labelUrl } : l
+            l.id === listingId ? { ...l, shipping_label_url: url } : l
           )
         );
-        setLabelInputId(null);
-        setLabelInputValue("");
+        setLabelInputs((prev) => {
+          const next = { ...prev };
+          delete next[listingId];
+          return next;
+        });
         showSuccess("Label opgeslagen ✓");
         router.refresh();
       }
     } catch {
-      alert("Netwerkfout. Probeer opnieuw.");
+      alert("Netwerkfout.");
     } finally {
       setSavingId(null);
     }
-  }
-
-  function openLabelInput(listingId: number) {
-    setLabelInputId(listingId);
-    setLabelInputValue("");
-  }
-
-  function renderLabelCell(l: ListingWithConsigner) {
-    const busy = savingId === l.id;
-
-    if (labelInputId === l.id) {
-      return (
-        <div style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 260 }}>
-          <input
-            type="url"
-            autoFocus
-            placeholder="https://…/label.pdf"
-            value={labelInputValue}
-            onChange={(e) => setLabelInputValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveLabel(l.id);
-              if (e.key === "Escape") { setLabelInputId(null); setLabelInputValue(""); }
-            }}
-            style={{
-              flex: 1,
-              background: "var(--panel-2)",
-              border: "1px solid var(--line)",
-              borderRadius: 6,
-              padding: "5px 9px",
-              color: "var(--text)",
-              fontSize: 13,
-              fontFamily: "inherit",
-              outline: "none",
-            }}
-          />
-          <button
-            className="btn sm"
-            type="button"
-            disabled={busy || !labelInputValue.trim()}
-            onClick={() => saveLabel(l.id)}
-          >
-            {busy ? "…" : "Opslaan"}
-          </button>
-          <button
-            className="btn ghost sm"
-            type="button"
-            disabled={busy}
-            onClick={() => { setLabelInputId(null); setLabelInputValue(""); }}
-          >
-            ✕
-          </button>
-        </div>
-      );
-    }
-
-    if (l.shipping_label_url) {
-      return (
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <a
-            href={l.shipping_label_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "var(--accent)", fontWeight: 600, fontSize: 13 }}
-          >
-            Label ↗
-          </a>
-          <button
-            className="btn ghost sm"
-            type="button"
-            onClick={() => openLabelInput(l.id)}
-          >
-            Wijzigen
-          </button>
-        </div>
-      );
-    }
-
-    return (
-      <button
-        className="btn sm"
-        type="button"
-        onClick={() => openLabelInput(l.id)}
-        style={{ background: "rgba(143,139,128,0.15)", color: "#8f8b80" }}
-      >
-        Label toevoegen
-      </button>
-    );
   }
 
   return (
@@ -230,7 +146,30 @@ export default function SalesSection({ initialListings }: Props) {
                   <td className="num">
                     {euro((l.sale_price_override ?? l.sale_price) - l.payout)}
                   </td>
-                  <td>{renderLabelCell(l)}</td>
+                  <td>
+                    <input
+                      type="text"
+                      placeholder="Plak label URL"
+                      value={labelInputs[l.id] ?? l.shipping_label_url ?? ""}
+                      onChange={(e) =>
+                        setLabelInputs((prev) => ({ ...prev, [l.id]: e.target.value }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveLabel(l.id);
+                      }}
+                      disabled={savingId === l.id}
+                      style={{
+                        width: "100%",
+                        background: "var(--panel-2)",
+                        border: "1px solid var(--line)",
+                        borderRadius: 6,
+                        padding: "5px 9px",
+                        color: "var(--text)",
+                        fontSize: 13,
+                        fontFamily: "inherit",
+                      }}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
