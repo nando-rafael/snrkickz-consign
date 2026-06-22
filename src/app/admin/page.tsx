@@ -4,6 +4,7 @@ import { getSession, isAdmin } from "@/lib/auth";
 import { euro, feePct } from "@/lib/config";
 import InventorySection from "./InventorySection";
 import ProductRequestsSection from "./ProductRequestsSection";
+import ListingsSection from "./ListingsSection";
 
 export const dynamic = "force-dynamic";
 
@@ -138,36 +139,7 @@ export default async function AdminPage() {
         )}
       </div>
 
-      <h2 className="section-title">Alle listings</h2>
-      <div className="table-wrap">
-        {listings.length === 0 ? <div className="empty">Nog geen listings.</div> : (
-          <table>
-            <thead><tr><th>Product</th><th>SKU</th><th>Maat</th><th>Consigner</th><th>Payout</th><th>Verkoop</th><th>Marge</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-              {listings.map((l) => (
-                <tr key={l.id}>
-                  <td><div className="prod">{l.product_image && <img src={l.product_image} alt="" />}<span className="t">{l.product_title}</span></div></td>
-                  <td><span className="sku">{l.sku}</span></td>
-                  <td><span className="size-chip">{l.size}</span></td>
-                  <td>{l.consigner_name}</td>
-                  <td className="num">{euro(l.payout)}</td>
-                  <td className="num">{euro(l.sale_price)}</td>
-                  <td className="num">{euro(l.sale_price - l.payout)}</td>
-                  <td><span className={`status ${l.status}`}>{l.status === "ACTIVE" ? "Live" : l.status === "SOLD" ? "Verkocht" : "Offline"}</span></td>
-                  <td>
-                    {l.status === "ACTIVE" && (
-                      <form action={`/api/listings/${l.id}/delist`} method="post">
-                        <button className="btn danger sm" type="submit">Delist</button>
-                      </form>
-                    )}
-                    {l.status === "SOLD" && l.order_name && <span className="size-chip">{l.order_name}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <ListingsSection initialListings={listings} />
     </main>
   );
 }
