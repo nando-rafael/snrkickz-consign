@@ -29,6 +29,7 @@ export type Listing = {
   payout: number;
   sale_price: number;
   original_price: number | null;
+  quantity: number;
   status: "ACTIVE" | "SOLD" | "DELISTED";
   order_name: string | null;
   created_at: string;
@@ -173,6 +174,7 @@ export const listingsTable = {
     input: Omit<Listing, "id" | "created_at" | "sold_at" | "order_name"> & {
       sold_at?: string | null;
       order_name?: string | null;
+      quantity?: number;
     }
   ): Listing {
     const store = getStore();
@@ -181,6 +183,7 @@ export const listingsTable = {
       created_at: now(),
       sold_at: null,
       order_name: null,
+      quantity: 1,
       ...input,
     };
     store.listings.push(row);
