@@ -172,10 +172,11 @@ export const listingsTable = {
     return getStore().listings.find((l) => l.id === id);
   },
   insert(
-    input: Omit<Listing, "id" | "created_at" | "sold_at" | "order_name" | "quantity"> & {
+    input: Omit<Listing, "id" | "created_at" | "sold_at" | "order_name" | "quantity" | "sale_price_override"> & {
       sold_at?: string | null;
       order_name?: string | null;
       quantity?: number;
+      sale_price_override?: number | null;
     }
   ): Listing {
     const store = getStore();
