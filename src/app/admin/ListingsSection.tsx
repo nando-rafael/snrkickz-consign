@@ -21,11 +21,26 @@ function euro(n: number): string {
   })}`;
 }
 
+function getLowestAskInfo(listing: ListingWithConsigner, allListings: ListingWithConsigner[]) {
+  const activeOnVariant = allListings.filter(
+    (l) => l.variant_id === listing.variant_id && l.status === "ACTIVE"
+  );
+  if (activeOnVariant.length === 0) return null;
+
+  const lowestPayout = Math.min(...activeOnVariant.map((l) => l.payout));
+  const count = activeOnVariant.length;
+  const isLowest = listing.payout === lowestPayout;
+  const undercutBy = isLowest ? 0 : listing.payout - lowestPayout;
+
+  return { count, lowestPayout, isLowest, undercutBy };
+}
+
 export default function ListingsSection({ initialListings }: Props) {
   const router = useRouter();
   const [listings, setListings] = useState<ListingWithConsigner[]>(initialListings);
   const [overrideTarget, setOverrideTarget] = useState<ListingWithConsigner | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
 
   function handleOverrideSuccess(listingId: number, newPrice: number) {
     setListings((prev) =>
@@ -38,6 +53,26 @@ export default function ListingsSection({ initialListings }: Props) {
     setTimeout(() => setSuccessMsg(null), 4000);
     router.refresh();
   }
+
+  const filtered = listings.filter((l) => {
+    if (filter === "lowest") {
+      const lowestOnVariant = Math.min(
+        ...listings
+          .filter((x) => x.variant_id === l.variant_id && x.status === "ACTIVE")
+          .map((x) => x.payout)
+      );
+      return l.payout === lowestOnVariant;
+    }
+    if (filter === "undercut") {
+      const lowestOnVariant = Math.min(
+        ...listings
+          .filter((x) => x.variant_id === l.variant_id && x.status === "ACTIVE")
+          .map((x) => x.payout)
+      );
+      return l.payout > lowestOnVariant;
+    }
+    return true;
+  });
 
   return (
     <>
@@ -60,9 +95,29 @@ export default function ListingsSection({ initialListings }: Props) {
         </div>
       )}
 
+      <div style={{ marginBottom: 12 }}>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as "all" | "lowest" | "undercut")}
+          style={{
+            background: "var(--card)",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            color: "var(--fg)",
+            padding: "6px 10px",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          <option value="all">Alle</option>
+          <option value="lowest">Alleen laagste</option>
+          <option value="undercut">Alleen ondercut</option>
+        </select>
+      </div>
+
       <div className="table-wrap">
-        {listings.length === 0 ? (
-          <div className="empty">Nog geen listings.</div>
+        {filtered.length === 0 ? (
+          <div className="empty">Geen listings gevonden.</div>
         ) : (
           <table>
             <thead>
@@ -76,11 +131,12 @@ export default function ListingsSection({ initialListings }: Props) {
                 <th>Verkoopprijs</th>
                 <th>Marge</th>
                 <th>Status</th>
+                <th>Lowest ask</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              {listings.map((l) => (
+              {filtered.map((l) => (
                 <tr key={l.id}>
                   <td>
                     <div className="prod">
@@ -130,6 +186,37 @@ export default function ListingsSection({ initialListings }: Props) {
                         ? "Verkocht"
                         : "Offline"}
                     </span>
+                  </td>
+                  <td>
+                    {l.status === "ACTIVE" && (() => {
+                      const info = getLowestAskInfo(l, listings);
+                      if (!info) return <span style={{ color: "var(--muted)" }}>—</span>;
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                            {info.count} actief
+                          </span>
+                          {info.isLowest ? (
+                            <span
+                              style={{
+                                background: "rgba(111,212,154,0.15)",
+                                color: "var(--green)",
+                                padding: "2px 8px",
+                                borderRadius: 4,
+                                fontSize: 11,
+                                fontWeight: 600,
+                              }}
+                            >
+                              Laagste
+                            </span>
+                          ) : (
+                            <span style={{ color: "#f97316", fontSize: 11, fontWeight: 600 }}>
+                              ↓ Ondercut €{info.undercutBy}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
