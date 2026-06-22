@@ -15,6 +15,15 @@ export type Consigner = {
   created_at: string;
 };
 
+export type ShippingStatus =
+  | "AWAITING_LABEL"
+  | "LABEL_SENT"
+  | "IN_TRANSIT"
+  | "RECEIVED"
+  | "SHIPPED_TO_CUSTOMER";
+
+export type ShippingCarrier = "UPS" | "DPD" | "PostNL" | "DHL" | "Other";
+
 export type Listing = {
   id: number;
   consigner_id: number;
@@ -35,6 +44,11 @@ export type Listing = {
   order_name: string | null;
   created_at: string;
   sold_at: string | null;
+  shipping_status: ShippingStatus | null;
+  shipping_label_url: string | null;
+  shipping_tracking_code: string | null;
+  shipping_carrier: ShippingCarrier | null;
+  shipping_note: string | null;
 };
 
 export type Payout = {
@@ -172,11 +186,16 @@ export const listingsTable = {
     return getStore().listings.find((l) => l.id === id);
   },
   insert(
-    input: Omit<Listing, "id" | "created_at" | "sold_at" | "order_name" | "quantity" | "sale_price_override"> & {
+    input: Omit<Listing, "id" | "created_at" | "sold_at" | "order_name" | "quantity" | "sale_price_override" | "shipping_status" | "shipping_label_url" | "shipping_tracking_code" | "shipping_carrier" | "shipping_note"> & {
       sold_at?: string | null;
       order_name?: string | null;
       quantity?: number;
       sale_price_override?: number | null;
+      shipping_status?: Listing["shipping_status"];
+      shipping_label_url?: string | null;
+      shipping_tracking_code?: string | null;
+      shipping_carrier?: Listing["shipping_carrier"];
+      shipping_note?: string | null;
     }
   ): Listing {
     const store = getStore();
@@ -187,6 +206,11 @@ export const listingsTable = {
       order_name: null,
       quantity: 1,
       sale_price_override: null,
+      shipping_status: null,
+      shipping_label_url: null,
+      shipping_tracking_code: null,
+      shipping_carrier: null,
+      shipping_note: null,
       ...input,
     };
     store.listings.push(row);
@@ -240,6 +264,7 @@ export const listingsTable = {
     l.status = "SOLD";
     l.order_name = orderName;
     l.sold_at = now();
+    l.shipping_status = "AWAITING_LABEL";
     save(store);
   },
   markDelisted(id: number): void {
