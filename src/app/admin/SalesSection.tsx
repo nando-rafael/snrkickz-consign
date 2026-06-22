@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Listing } from "@/lib/db";
 
@@ -23,37 +23,47 @@ function euro(n: number): string {
 export default function SalesSection({ initialListings }: Props) {
   const router = useRouter();
   const [listings, setListings] = useState<ListingWithConsigner[]>(initialListings);
-  const [labelInputId, setLabelInputId] = useState<number | null>(null);
-  const [labelInputValue, setLabelInputValue] = useState("");
+  const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const fileInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   function showSuccess(msg: string) {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 4000);
   }
 
-  async function saveLabel(listingId: number) {
-    const url = labelInputValue.trim();
-    if (!url) return;
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>, listingId: number) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      alert("Alleen PDF bestanden zijn toegestaan.");
+      e.target.value = "";
+      return;
+    }
+
     setSavingId(listingId);
+    setUploadingId(listingId);
+
     try {
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch(`/api/admin/listings/${listingId}/label`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ labelUrl: url }),
+        body: formData,
       });
       const data = await res.json();
+
       if (!res.ok) {
-        alert(data.error || "Opslaan mislukt.");
+        alert(data.error || "Uploaden mislukt.");
       } else {
         setListings((prev) =>
           prev.map((l) =>
             l.id === listingId ? { ...l, shipping_label_url: data.labelUrl } : l
           )
         );
-        setLabelInputId(null);
-        setLabelInputValue("");
         showSuccess("Label opgeslagen ✓");
         router.refresh();
       }
@@ -61,93 +71,72 @@ export default function SalesSection({ initialListings }: Props) {
       alert("Netwerkfout. Probeer opnieuw.");
     } finally {
       setSavingId(null);
+      setUploadingId(null);
+      // Reset the file input so the same file can be re-selected if needed
+      const input = fileInputRefs.current.get(listingId);
+      if (input) input.value = "";
     }
   }
 
-  function openLabelInput(listingId: number) {
-    setLabelInputId(listingId);
-    setLabelInputValue("");
+  function triggerFileInput(listingId: number) {
+    fileInputRefs.current.get(listingId)?.click();
   }
 
   function renderLabelCell(l: ListingWithConsigner) {
     const busy = savingId === l.id;
+    const uploading = uploadingId === l.id;
 
-    if (labelInputId === l.id) {
-      return (
-        <div style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 260 }}>
-          <input
-            type="url"
-            autoFocus
-            placeholder="https://…/label.pdf"
-            value={labelInputValue}
-            onChange={(e) => setLabelInputValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveLabel(l.id);
-              if (e.key === "Escape") { setLabelInputId(null); setLabelInputValue(""); }
-            }}
-            style={{
-              flex: 1,
-              background: "var(--panel-2)",
-              border: "1px solid var(--line)",
-              borderRadius: 6,
-              padding: "5px 9px",
-              color: "var(--text)",
-              fontSize: 13,
-              fontFamily: "inherit",
-              outline: "none",
-            }}
-          />
-          <button
-            className="btn sm"
-            type="button"
-            disabled={busy || !labelInputValue.trim()}
-            onClick={() => saveLabel(l.id)}
-          >
-            {busy ? "…" : "Opslaan"}
-          </button>
-          <button
-            className="btn ghost sm"
-            type="button"
-            disabled={busy}
-            onClick={() => { setLabelInputId(null); setLabelInputValue(""); }}
-          >
-            ✕
-          </button>
-        </div>
-      );
-    }
+    const hiddenInput = (
+      <input
+        key={`file-input-${l.id}`}
+        type="file"
+        accept=".pdf,application/pdf"
+        onChange={(e) => handleFileUpload(e, l.id)}
+        style={{ display: "none" }}
+        ref={(el) => {
+          if (el) fileInputRefs.current.set(l.id, el);
+          else fileInputRefs.current.delete(l.id);
+        }}
+      />
+    );
 
     if (l.shipping_label_url) {
       return (
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {hiddenInput}
           <a
             href={l.shipping_label_url}
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: "var(--accent)", fontWeight: 600, fontSize: 13 }}
           >
-            Label ↗
+            Label ✓
           </a>
           <button
             className="btn ghost sm"
             type="button"
-            onClick={() => openLabelInput(l.id)}
+            disabled={busy}
+            onClick={() => triggerFileInput(l.id)}
           >
-            Wijzigen
+            {uploading ? "…" : "Wijzigen"}
           </button>
         </div>
       );
     }
 
     return (
-      <button
-        className="btn sm"
-        type="button"
-        onClick={() => openLabelInput(l.id)}
-        style={{ background: "rgba(143,139,128,0.15)", color: "#8f8b80" }}
-      >
-        Label toevoegen
-      </button>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        {hiddenInput}
+        <button
+          className="btn sm"
+          type="button"
+          disabled={busy}
+          onClick={() => triggerFileInput(l.id)}
+          style={{ background: "rgba(143,139,128,0.15)", color: "#8f8b80" }}
+        >
+          {uploading ? "Uploaden…" : "Label toevoegen"}
+        </button>
+      </div>
     );
   }
 
