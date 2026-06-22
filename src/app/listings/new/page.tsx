@@ -42,6 +42,7 @@ export default function NewListing() {
   // Step 2: chosen product + per-size payouts
   const [product, setProduct] = useState<SelectedProduct | null>(null);
   const [payouts, setPayouts] = useState<Record<string, string>>({});
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -63,10 +64,12 @@ export default function NewListing() {
       const raw = payouts[v.id] ?? "";
       const num = parseFloat(raw);
       if (!raw || isNaN(num) || num <= 0) return [];
-      return [{ variant: v, payout: num }];
+      const qty = Math.max(1, Math.min(10, quantities[v.id] ?? 1));
+      return [{ variant: v, payout: num, quantity: qty }];
     }) ?? [];
 
-  const listingCount = activeEntries.length;
+  /** Total number of individual listings that will be created */
+  const listingCount = activeEntries.reduce((sum, e) => sum + e.quantity, 0);
 
   /** True if any entered payout exceeds the variant's maxPayout */
   const hasOverpay =
@@ -86,6 +89,7 @@ export default function NewListing() {
     setResults(null);
     setProduct(null);
     setPayouts({});
+    setQuantities({});
     setSuccessCount(null);
     setFailedItems([]);
     if (!query.trim()) {
@@ -122,6 +126,7 @@ export default function NewListing() {
       variants: p.variants,
     });
     setPayouts({});
+    setQuantities({});
     setError(null);
     setSuccessCount(null);
     setFailedItems([]);
@@ -130,6 +135,7 @@ export default function NewListing() {
   function backToResults() {
     setProduct(null);
     setPayouts({});
+    setQuantities({});
     setError(null);
     setSuccessCount(null);
     setFailedItems([]);
@@ -137,6 +143,10 @@ export default function NewListing() {
 
   function setPayoutForVariant(variantId: string, value: string) {
     setPayouts((prev) => ({ ...prev, [variantId]: value }));
+  }
+
+  function setQuantityForVariant(variantId: string, value: number) {
+    setQuantities((prev) => ({ ...prev, [variantId]: Math.max(1, Math.min(10, value)) }));
   }
 
   async function submit() {
@@ -153,9 +163,10 @@ export default function NewListing() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           styleCode: product.sku,
-          listings: activeEntries.map(({ variant, payout }) => ({
+          listings: activeEntries.map(({ variant, payout, quantity }) => ({
             variantId: variant.id,
             payout,
+            quantity,
           })),
         }),
       });
@@ -164,12 +175,14 @@ export default function NewListing() {
         setError(data.error || "Plaatsen mislukt.");
         setSubmitting(false);
       } else {
-        const created: unknown[] = data.created ?? [];
+        const created: { ids: number[] }[] = data.created ?? [];
         const failed: { variantId: string; error: string }[] = data.failed ?? [];
-        if (created.length > 0) {
-          setSuccessCount(created.length);
+        const totalCreated = created.reduce((sum, c) => sum + (c.ids?.length ?? 1), 0);
+        if (totalCreated > 0) {
+          setSuccessCount(totalCreated);
           setFailedItems(failed);
           setPayouts({});
+          setQuantities({});
           // Redirect after a short delay so the user sees the success message
           setTimeout(() => {
             router.push("/dashboard");
@@ -560,6 +573,7 @@ export default function NewListing() {
                     <th className="num">Max payout</th>
                     <th className="num">Jouw payout (€)</th>
                     <th className="num">Verkoopprijs</th>
+                    <th className="num">Aantal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -620,6 +634,22 @@ export default function NewListing() {
                           ) : (
                             <span style={{ color: "var(--muted)" }}>—</span>
                           )}
+                        </td>
+                        <td className="num" style={{ width: 80 }}>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            step={1}
+                            value={quantities[v.id] ?? 1}
+                            onChange={(e) => setQuantityForVariant(v.id, parseInt(e.target.value, 10) || 1)}
+                            style={{
+                              textAlign: "right",
+                              padding: "7px 10px",
+                              fontSize: 13,
+                              width: "100%",
+                            }}
+                          />
                         </td>
                       </tr>
                     );
