@@ -33,6 +33,7 @@ export type Listing = {
   order_name: string | null;
   created_at: string;
   sold_at: string | null;
+  quantity: number;
 };
 
 export type Payout = {
@@ -170,9 +171,10 @@ export const listingsTable = {
     return getStore().listings.find((l) => l.id === id);
   },
   insert(
-    input: Omit<Listing, "id" | "created_at" | "sold_at" | "order_name"> & {
+    input: Omit<Listing, "id" | "created_at" | "sold_at" | "order_name" | "quantity"> & {
       sold_at?: string | null;
       order_name?: string | null;
+      quantity?: number;
     }
   ): Listing {
     const store = getStore();
@@ -181,6 +183,7 @@ export const listingsTable = {
       created_at: now(),
       sold_at: null,
       order_name: null,
+      quantity: 1,
       ...input,
     };
     store.listings.push(row);

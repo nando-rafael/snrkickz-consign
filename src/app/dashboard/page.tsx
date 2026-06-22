@@ -1,9 +1,51 @@
 import { redirect } from "next/navigation";
-import { listingsTable, payoutsTable, productRequestsTable } from "@/lib/db";
+import { listingsTable, payoutsTable, productRequestsTable, type Listing } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { euro } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
+
+type ListingGroup = {
+  key: string;
+  sku: string;
+  size: string;
+  payout: number;
+  sale_price: number;
+  product_title: string | null;
+  product_image: string | null;
+  listings: Listing[];
+  liveCount: number;
+  soldCount: number;
+  delistedCount: number;
+};
+
+function groupListings(listings: Listing[]): ListingGroup[] {
+  const map = new Map<string, ListingGroup>();
+  for (const l of listings) {
+    const key = `${l.sku}__${l.size}__${l.payout}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        sku: l.sku,
+        size: l.size,
+        payout: l.payout,
+        sale_price: l.sale_price,
+        product_title: l.product_title,
+        product_image: l.product_image,
+        listings: [],
+        liveCount: 0,
+        soldCount: 0,
+        delistedCount: 0,
+      });
+    }
+    const group = map.get(key)!;
+    group.listings.push(l);
+    if (l.status === "ACTIVE") group.liveCount++;
+    else if (l.status === "SOLD") group.soldCount++;
+    else group.delistedCount++;
+  }
+  return Array.from(map.values());
+}
 
 export default async function Dashboard() {
   const session = await getSession();
@@ -17,6 +59,8 @@ export default async function Dashboard() {
   const sold = listings.filter((l) => l.status === "SOLD");
   const pendingSum = payouts.filter((p) => p.status === "PENDING").reduce((s, p) => s + p.amount, 0);
   const paidSum = payouts.filter((p) => p.status === "PAID").reduce((s, p) => s + p.amount, 0);
+
+  const listingGroups = groupListings(listings);
 
   return (
     <main className="page container">
@@ -44,26 +88,70 @@ export default async function Dashboard() {
           <div className="empty">Nog geen listings. Voeg je eerste paar toe via "Nieuwe listing".</div>
         ) : (
           <table>
-            <thead><tr><th>Product</th><th>SKU</th><th>Maat</th><th>Payout</th><th>Verkoopprijs</th><th>Status</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>SKU</th>
+                <th>Maat</th>
+                <th>Payout</th>
+                <th>Verkoopprijs</th>
+                <th>Aantal</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody>
-              {listings.map((l) => (
-                <tr key={l.id}>
-                  <td><div className="prod">{l.product_image && <img src={l.product_image} alt="" />}<span className="t">{l.product_title}</span></div></td>
-                  <td><span className="sku">{l.sku}</span></td>
-                  <td><span className="size-chip">EU {l.size}</span></td>
-                  <td className="num">{euro(l.payout)}</td>
-                  <td className="num">{euro(l.sale_price)}</td>
-                  <td><span className={`status ${l.status}`}>{l.status === "ACTIVE" ? "Live" : l.status === "SOLD" ? "Verkocht" : "Offline"}</span></td>
-                  <td>
-                    {l.status === "ACTIVE" && (
-                      <form action={`/api/listings/${l.id}/delist`} method="post">
-                        <button className="btn danger sm" type="submit">Verwijderen</button>
-                      </form>
-                    )}
-                    {l.status === "SOLD" && l.order_name && <span className="size-chip">{l.order_name}</span>}
-                  </td>
-                </tr>
-              ))}
+              {listingGroups.map((g) => {
+                const total = g.listings.length;
+                const statusParts: string[] = [];
+                if (g.liveCount > 0) statusParts.push(`${g.liveCount} LIVE`);
+                if (g.soldCount > 0) statusParts.push(`${g.soldCount} SOLD`);
+                if (g.delistedCount > 0) statusParts.push(`${g.delistedCount} OFFLINE`);
+                const statusLabel = statusParts.join(", ");
+
+                return (
+                  <tr key={g.key}>
+                    <td>
+                      <div className="prod">
+                        {g.product_image && <img src={g.product_image} alt="" />}
+                        <span className="t">{g.product_title}</span>
+                      </div>
+                    </td>
+                    <td><span className="sku">{g.sku}</span></td>
+                    <td><span className="size-chip">EU {g.size}</span></td>
+                    <td className="num">{euro(g.payout)}</td>
+                    <td className="num">{euro(g.sale_price)}</td>
+                    <td className="num" style={{ fontWeight: total > 1 ? 700 : 400 }}>
+                      {total > 1 ? `${total}×` : "1"}
+                    </td>
+                    <td>
+                      <span
+                        style={{ fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {g.listings
+                          .filter((l) => l.status === "ACTIVE")
+                          .map((l) => (
+                            <form key={l.id} action={`/api/listings/${l.id}/delist`} method="post">
+                              <button className="btn danger sm" type="submit">
+                                {total > 1 ? `#${l.id} verwijderen` : "Verwijderen"}
+                              </button>
+                            </form>
+                          ))}
+                        {g.listings
+                          .filter((l) => l.status === "SOLD" && l.order_name)
+                          .map((l) => (
+                            <span key={l.id} className="size-chip">{l.order_name}</span>
+                          ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

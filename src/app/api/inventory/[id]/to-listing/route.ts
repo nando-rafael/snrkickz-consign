@@ -26,6 +26,9 @@ export async function POST(
   const body = await req.json().catch(() => ({}));
   const payout = parseFloat(body.payout);
   const sale_price_override = body.sale_price ? parseFloat(body.sale_price) : null;
+  const quantity = body.quantity != null
+    ? Math.max(1, Math.min(10, parseInt(String(body.quantity), 10) || 1))
+    : 1;
 
   if (!payout || payout <= 0) {
     return NextResponse.json({ error: "Vul een geldige payout in" }, { status: 400 });
@@ -60,23 +63,27 @@ export async function POST(
     const existing = listingsTable.findEarliestOriginalPrice(variant.id);
     const originalPrice = existing?.original_price ?? parseFloat(variant.price);
 
-    await adjustInventory(variant.inventoryItemId, 1);
+    await adjustInventory(variant.inventoryItemId, quantity);
 
-    const listing = listingsTable.insert({
-      consigner_id: session.id,
-      sku: item.sku,
-      style_code: item.sku,
-      size: item.size,
-      product_title: item.product_title || product.productTitle,
-      product_image: product.imageUrl,
-      product_id: product.productId,
-      variant_id: variant.id,
-      inventory_item_id: variant.inventoryItemId,
-      payout,
-      sale_price: salePrice,
-      original_price: originalPrice,
-      status: "ACTIVE",
-    });
+    const listingIds: number[] = [];
+    for (let i = 0; i < quantity; i++) {
+      const listing = listingsTable.insert({
+        consigner_id: session.id,
+        sku: item.sku,
+        style_code: item.sku,
+        size: item.size,
+        product_title: item.product_title || product.productTitle,
+        product_image: product.imageUrl,
+        product_id: product.productId,
+        variant_id: variant.id,
+        inventory_item_id: variant.inventoryItemId,
+        payout,
+        sale_price: salePrice,
+        original_price: originalPrice,
+        status: "ACTIVE",
+      });
+      listingIds.push(listing.id);
+    }
 
     await recalcVariantPrice(variant.id);
 
@@ -87,19 +94,20 @@ export async function POST(
       }
     } catch (e: any) {
       console.error(`Failed to add product to collection: ${e.message}`);
-      // Don't throw — listing is already created
+      // Don't throw — listings are already created
     }
 
     // Remove from inventory (or decrement quantity if > 1)
-    if (item.quantity > 1) {
-      inventoryTable.updateQuantity(id, item.quantity - 1);
+    const remaining = item.quantity - quantity;
+    if (remaining > 0) {
+      inventoryTable.updateQuantity(id, remaining);
     } else {
       inventoryTable.delete(id);
     }
 
     return NextResponse.json({
       ok: true,
-      listing_id: listing.id,
+      listing_ids: listingIds,
       sku: item.sku,
       size: item.size,
       salePrice,
