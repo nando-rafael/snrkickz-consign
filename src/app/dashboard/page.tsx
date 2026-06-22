@@ -151,6 +151,17 @@ export default async function Dashboard() {
                             <button className="btn danger sm" type="submit">Verwijderen</button>
                           </form>
                         )}
+                        {l.status === "SOLD" && l.shipping_label_url && (
+                          <a
+                            href={l.shipping_label_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn sm"
+                            style={{ background: "rgba(96,165,250,0.15)", color: "#60a5fa" }}
+                          >
+                            Verzendlabel ↗
+                          </a>
+                        )}
                       </td>
                     </tr>
                   ))}
