@@ -38,13 +38,13 @@ export async function POST(
   }
 
   const filename = `listing-${listing.id}-${Date.now()}.pdf`;
-  const labelsDir = path.join(process.cwd(), "public", "labels");
-  fs.mkdirSync(labelsDir, { recursive: true });
+  const uploadsDir = path.join(process.cwd(), "public", "uploads", "labels");
+  fs.mkdirSync(uploadsDir, { recursive: true });
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  fs.writeFileSync(path.join(labelsDir, filename), buffer);
+  fs.writeFileSync(path.join(uploadsDir, filename), buffer);
 
-  const labelUrl = `/labels/${filename}`;
+  const labelUrl = `/uploads/labels/${filename}`;
 
   const updated = listingsTable.update(listing.id, {
     shipping_label_url: labelUrl,
