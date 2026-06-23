@@ -153,7 +153,7 @@ export default async function Dashboard() {
                         )}
                         {l.status === "SOLD" && l.shipping_label_url && (
                           <a
-                            href={l.shipping_label_url}
+                            href={`/api/labels/${l.shipping_label_url}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn sm"
