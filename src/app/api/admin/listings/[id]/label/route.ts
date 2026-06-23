@@ -44,7 +44,7 @@ export async function POST(
   const buffer = Buffer.from(await file.arrayBuffer());
   fs.writeFileSync(path.join(uploadsDir, filename), buffer);
 
-  const labelUrl = `/uploads/labels/${filename}`;
+  const labelUrl = filename;
 
   const updated = listingsTable.update(listing.id, {
     shipping_label_url: labelUrl,
