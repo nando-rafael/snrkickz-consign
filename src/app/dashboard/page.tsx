@@ -70,35 +70,35 @@ export default async function Dashboard() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Hey {session.name.split(" ")[0]}</h1>
-          <p className="page-sub">Jouw consignment overzicht</p>
+          <p className="page-sub">Your consignment overview</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <a href="/dashboard/settings" className="btn">⚙️ Instellingen</a>
-          <a href="/listings/new" className="btn">+ Nieuwe listing</a>
+          <a href="/dashboard/settings" className="btn">⚙️ Settings</a>
+          <a href="/listings/new" className="btn">+ New Listing</a>
         </div>
       </div>
 
       <div className="stats">
-        <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
-        <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
-        <div className="stat"><div className="label">Openstaande payout</div><div className="value">{euro(pendingSum)}</div></div>
-        <div className="stat"><div className="label">Uitbetaald</div><div className="value">{euro(paidSum)}</div></div>
+        <div className="stat"><div className="label">Live Listings</div><div className="value">{active.length}</div></div>
+        <div className="stat"><div className="label">Sold</div><div className="value">{sold.length}</div></div>
+        <div className="stat"><div className="label">Pending Payout</div><div className="value">{euro(pendingSum)}</div></div>
+        <div className="stat"><div className="label">Paid Out</div><div className="value">{euro(paidSum)}</div></div>
       </div>
 
       <h2 className="section-title">Listings</h2>
       <div className="table-wrap">
         {groups.length === 0 ? (
-          <div className="empty">Nog geen listings. Voeg je eerste paar toe via "Nieuwe listing".</div>
+          <div className="empty">No listings yet. Add your first pair via "New Listing".</div>
         ) : (
           <table>
             <thead>
               <tr>
                 <th>Product</th>
                 <th>SKU</th>
-                <th>Maat</th>
+                <th>Size</th>
                 <th>Payout</th>
-                <th>Verkoopprijs</th>
-                <th>Aantal</th>
+                <th>Sale Price</th>
+                <th>Qty</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -136,19 +136,19 @@ export default async function Dashboard() {
                   {g.listings.map((l) => (
                     <tr key={l.id} style={{ background: "var(--panel-2)", fontSize: 12 }}>
                       <td colSpan={5} style={{ paddingLeft: 32, color: "var(--muted)" }}>
-                        #{l.id} — aangemeld {l.created_at.slice(0, 10)}
+                        #{l.id} — listed {l.created_at.slice(0, 10)}
                         {l.order_name && ` · ${l.order_name}`}
                       </td>
                       <td />
                       <td>
                         <span className={`status ${l.status}`}>
-                          {l.status === "ACTIVE" ? "Live" : l.status === "SOLD" ? "Verkocht" : "Offline"}
+                          {l.status === "ACTIVE" ? "Live" : l.status === "SOLD" ? "Sold" : "Offline"}
                         </span>
                       </td>
                       <td>
                         {l.status === "ACTIVE" && (
                           <form action={`/api/listings/${l.id}/delist`} method="post">
-                            <button className="btn danger sm" type="submit">Verwijderen</button>
+                            <button className="btn danger sm" type="submit">Delist</button>
                           </form>
                         )}
                         {l.status === "SOLD" && l.shipping_label_url && (
@@ -159,7 +159,7 @@ export default async function Dashboard() {
                             className="btn sm"
                             style={{ background: "rgba(96,165,250,0.15)", color: "#60a5fa" }}
                           >
-                            Verzendlabel ↗
+                            Shipping Label ↗
                           </a>
                         )}
                       </td>
@@ -172,20 +172,20 @@ export default async function Dashboard() {
         )}
       </div>
 
-      <h2 className="section-title">Uitbetalingen</h2>
+      <h2 className="section-title">Payouts</h2>
       <div className="table-wrap">
         {payouts.length === 0 ? (
-          <div className="empty">Zodra een listing verkoopt verschijnt je payout hier.</div>
+          <div className="empty">Your payouts will appear here once a listing sells.</div>
         ) : (
           <table>
-            <thead><tr><th>Datum</th><th>Order</th><th>Bedrag</th><th>Status</th></tr></thead>
+            <thead><tr><th>Date</th><th>Order</th><th>Amount</th><th>Status</th></tr></thead>
             <tbody>
               {payouts.map((p) => (
                 <tr key={p.id}>
                   <td>{p.created_at.slice(0, 10)}</td>
                   <td><span className="size-chip">{p.order_name}</span></td>
                   <td className="num">{euro(p.amount)}</td>
-                  <td><span className={`status ${p.status}`}>{p.status === "PENDING" ? "In behandeling" : "Uitbetaald"}</span></td>
+                  <td><span className={`status ${p.status}`}>{p.status === "PENDING" ? "Pending" : "Paid"}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -193,18 +193,18 @@ export default async function Dashboard() {
         )}
       </div>
 
-      <h2 className="section-title">Mijn product requests</h2>
+      <h2 className="section-title">My Product Requests</h2>
       <div className="table-wrap">
         {productRequests.length === 0 ? (
-          <div className="empty">Je hebt nog geen product requests ingediend.</div>
+          <div className="empty">You haven't submitted any product requests yet.</div>
         ) : (
           <table>
             <thead>
               <tr>
                 <th>SKU</th>
-                <th>Productnaam</th>
+                <th>Product Name</th>
                 <th>Status</th>
-                <th>Datum</th>
+                <th>Date</th>
               </tr>
             </thead>
             <tbody>

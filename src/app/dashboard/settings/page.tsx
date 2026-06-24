@@ -18,7 +18,7 @@ export default async function SettingsPage({
   return (
     <main className="page container">
       <div className="card">
-        <h1 className="page-title">Instellingen</h1>
+        <h1 className="page-title">Settings</h1>
         
         {searchParams.success && (
           <div className="success" style={{ marginBottom: 24 }}>
@@ -32,9 +32,9 @@ export default async function SettingsPage({
         )}
 
         <div style={{ marginBottom: 32 }}>
-          <h2 style={{ marginBottom: 16 }}>Discord Notificaties</h2>
+          <h2 style={{ marginBottom: 16 }}>Discord Notifications</h2>
           <p style={{ marginBottom: 16, color: "#666" }}>
-            Ontvang een Discord bericht wanneer een van je items verkoopt.
+            Receive a Discord message when one of your items sells.
           </p>
           
           <form action="/api/settings/discord" method="post">
@@ -49,23 +49,23 @@ export default async function SettingsPage({
                 className="mono"
               />
               <p className="hint">
-                Plak hier de webhook URL van je Discord channel. 
+                Paste the webhook URL from your Discord channel here.
                 <a href="https://support.discord.com/hc/en-us/articles/228383668-Webhooks-Guide" target="_blank" rel="noopener noreferrer">
-                  {" "}Hoe maak ik een webhook?
+                  {" "}How do I create a webhook?
                 </a>
               </p>
             </div>
             <button className="btn" type="submit">
-              Opslaan
+              Save
             </button>
           </form>
         </div>
 
         <div style={{ marginBottom: 32 }}>
-          <h2 style={{ marginBottom: 16 }}>Profiel</h2>
+          <h2 style={{ marginBottom: 16 }}>Profile</h2>
           <div style={{ marginBottom: 16 }}>
-            <p><strong>Naam:</strong> {consigner.name}</p>
-            <p><strong>E-mail:</strong> {consigner.email}</p>
+            <p><strong>Name:</strong> {consigner.name}</p>
+            <p><strong>Email:</strong> {consigner.email}</p>
             {consigner.discord_username && (
               <p><strong>Discord:</strong> {consigner.discord_username}</p>
             )}
@@ -77,7 +77,7 @@ export default async function SettingsPage({
 
         <div>
           <a href="/dashboard" className="btn">
-            Terug naar dashboard
+            Back to Dashboard
           </a>
         </div>
       </div>
