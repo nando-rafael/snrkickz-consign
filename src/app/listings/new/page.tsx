@@ -93,7 +93,7 @@ export default function NewListing() {
     setSuccessCount(null);
     setFailedItems([]);
     if (!query.trim()) {
-      setError("Vul een stylecode, SKU of productnaam in.");
+      setError("Please enter a style code, SKU, or product name.");
       return;
     }
     setLoading(true);
@@ -105,13 +105,13 @@ export default function NewListing() {
         // No products found — show the "request product" prompt
         setResults([]);
       } else if (!res.ok) {
-        setError(data.error || "Lookup mislukt.");
+        setError(data.error || "Lookup failed.");
       } else {
         setFeePct(data.feePct);
         setResults(data.products);
       }
     } catch {
-      setError("Netwerkfout. Probeer opnieuw.");
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -153,7 +153,7 @@ export default function NewListing() {
     setError(null);
     if (!product || listingCount === 0) return;
     if (hasOverpay) {
-      setError("Een of meer payouts zijn te hoog. Corrigeer de rood gemarkeerde velden.");
+      setError("One or more payouts are too high. Please correct the fields highlighted in red.");
       return;
     }
     setSubmitting(true);
@@ -172,7 +172,7 @@ export default function NewListing() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Plaatsen mislukt.");
+        setError(data.error || "Submission failed.");
         setSubmitting(false);
       } else {
         const created: { ids: number[] }[] = data.created ?? [];
@@ -191,13 +191,13 @@ export default function NewListing() {
         } else {
           // All failed
           setError(
-            failed.map((f) => f.error).join(" · ") || "Plaatsen mislukt."
+            failed.map((f) => f.error).join(" · ") || "Submission failed."
           );
           setSubmitting(false);
         }
       }
     } catch {
-      setError("Netwerkfout. Probeer opnieuw.");
+      setError("Network error. Please try again.");
       setSubmitting(false);
     }
   }
@@ -224,10 +224,10 @@ export default function NewListing() {
     const product_name = reqName.trim();
     const stockx_url = reqUrl.trim();
 
-    if (!sku) { setReqError("SKU is verplicht"); return; }
-    if (!product_name) { setReqError("Productnaam is verplicht"); return; }
+    if (!sku) { setReqError("SKU is required"); return; }
+    if (!product_name) { setReqError("Product name is required"); return; }
     if (!stockx_url || !/^https:\/\/stockx\.com\//.test(stockx_url)) {
-      setReqError("Alleen StockX links worden geaccepteerd");
+      setReqError("Only StockX links are accepted");
       return;
     }
 
@@ -240,7 +240,7 @@ export default function NewListing() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setReqError(data.error || "Aanvragen mislukt.");
+        setReqError(data.error || "Request failed.");
       } else {
         setReqSuccess(true);
         setTimeout(() => {
@@ -248,7 +248,7 @@ export default function NewListing() {
         }, 2000);
       }
     } catch {
-      setReqError("Netwerkfout. Probeer opnieuw.");
+      setReqError("Network error. Please try again.");
     } finally {
       setReqSubmitting(false);
     }
@@ -261,10 +261,10 @@ export default function NewListing() {
         style={{ maxWidth: product ? 720 : 560, margin: "0 auto", transition: "max-width 0.2s" }}
       >
         <h1 className="page-title" style={{ marginBottom: 4 }}>
-          Nieuwe listing
+          New Listing
         </h1>
         <p className="page-sub" style={{ marginBottom: 24 }}>
-          Zoek op stylecode, SKU of productnaam — de maten komen direct uit de store.
+          Search by style code, SKU, or product name — sizes are pulled directly from the store.
         </p>
 
         {error && <div className="error">{error}</div>}
@@ -283,10 +283,10 @@ export default function NewListing() {
               fontWeight: 600,
             }}
           >
-            ✓ {successCount} listing{successCount !== 1 ? "s" : ""} geplaatst — je wordt doorgestuurd…
+            ✓ {successCount} listing{successCount !== 1 ? "s" : ""} created — redirecting…
             {failedItems.length > 0 && (
               <div style={{ marginTop: 8, fontWeight: 400, color: "#e8a0a0", fontSize: 13 }}>
-                {failedItems.length} maat/maten mislukt:{" "}
+                {failedItems.length} size{failedItems.length !== 1 ? "s" : ""} failed:{" "}
                 {failedItems.map((f) => f.error).join(" · ")}
               </div>
             )}
@@ -296,11 +296,11 @@ export default function NewListing() {
         {/* ── Step 1: search bar (always visible when no product selected) ── */}
         {!product && (
           <div className="field">
-            <label htmlFor="query">Stylecode, SKU of productnaam</label>
+            <label htmlFor="query">Style code, SKU, or product name</label>
             <div style={{ display: "flex", gap: 10 }}>
               <input
                 id="query"
-                placeholder="KH7719 of Air Max 90"
+                placeholder="KH7719 or Air Max 90"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && lookup()}
@@ -312,11 +312,11 @@ export default function NewListing() {
                 type="button"
                 style={{ whiteSpace: "nowrap" }}
               >
-                {loading ? "Zoeken…" : "Zoek"}
+                {loading ? "Searching…" : "Search"}
               </button>
             </div>
             <p className="hint">
-              Zoek op stylecode (bijv. KH7719), SKU of een deel van de productnaam.
+              Search by style code (e.g. KH7719), SKU, or part of the product name.
             </p>
           </div>
         )}
@@ -326,8 +326,8 @@ export default function NewListing() {
           <div style={{ marginTop: 8 }}>
             <p className="hint" style={{ marginBottom: 10 }}>
               {results.length === 1
-                ? "1 product gevonden — klik om te selecteren."
-                : `${results.length} producten gevonden — kies de juiste kleur/variant.`}
+                ? "1 product found — click to select."
+                : `${results.length} products found — choose the correct colour/variant.`}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {results.map((p) => (
@@ -389,7 +389,7 @@ export default function NewListing() {
                     </div>
                     <div style={{ fontSize: 12, color: "var(--muted)" }}>
                       <span style={{ marginRight: 10 }}>SKU: {p.sku || "—"}</span>
-                      <span>{p.variantCount} maten beschikbaar</span>
+                      <span>{p.variantCount} sizes available</span>
                     </div>
                   </div>
                   <svg
@@ -426,14 +426,14 @@ export default function NewListing() {
             }}
           >
             <p style={{ marginBottom: 12, color: "var(--muted)", fontSize: 14 }}>
-              Geen producten gevonden voor &ldquo;{query}&rdquo;
+              No products found for &ldquo;{query}&rdquo;
             </p>
             <button
               className="btn ghost"
               type="button"
               onClick={openRequestModal}
             >
-              Product staat er niet bij? Vraag aan.
+              Product not listed? Request it.
             </button>
           </div>
         )}
@@ -454,10 +454,10 @@ export default function NewListing() {
           >
             <div className="card" style={{ width: "100%", maxWidth: 460 }}>
               <h2 className="page-title" style={{ fontSize: 17, marginBottom: 4 }}>
-                Product aanvragen
+                Request a Product
               </h2>
               <p className="page-sub" style={{ marginBottom: 20 }}>
-                Staat het product er niet bij? Vul de gegevens in en wij voegen het toe.
+                Can&apos;t find the product? Fill in the details and we&apos;ll add it.
               </p>
 
               {reqSuccess ? (
@@ -472,14 +472,14 @@ export default function NewListing() {
                     fontWeight: 600,
                   }}
                 >
-                  ✓ Product aangevraagd! Je krijgt bericht zodra het online staat.
+                  ✓ Product requested! We&apos;ll notify you once it&apos;s live.
                 </div>
               ) : (
                 <>
                   {reqError && <div className="error">{reqError}</div>}
 
                   <div className="field">
-                    <label htmlFor="req-sku">SKU / Stylecode</label>
+                    <label htmlFor="req-sku">SKU / Style Code</label>
                     <input
                       id="req-sku"
                       className="mono"
@@ -490,7 +490,7 @@ export default function NewListing() {
                   </div>
 
                   <div className="field">
-                    <label htmlFor="req-name">Productnaam</label>
+                    <label htmlFor="req-name">Product Name</label>
                     <input
                       id="req-name"
                       placeholder="Adidas Samba OG Cloud White"
@@ -508,7 +508,7 @@ export default function NewListing() {
                       value={reqUrl}
                       onChange={(e) => setReqUrl(e.target.value)}
                     />
-                    <p className="hint">Alleen links die beginnen met https://stockx.com/</p>
+                    <p className="hint">Only links starting with https://stockx.com/</p>
                   </div>
 
                   <div style={{ display: "flex", gap: 10 }}>
@@ -519,14 +519,14 @@ export default function NewListing() {
                       disabled={reqSubmitting}
                       style={{ flex: 1 }}
                     >
-                      {reqSubmitting ? "Aanvragen…" : "Vraag product aan"}
+                      {reqSubmitting ? "Submitting…" : "Request Product"}
                     </button>
                     <button
                       className="btn ghost"
                       type="button"
                       onClick={closeRequestModal}
                     >
-                      Annuleer
+                      Cancel
                     </button>
                   </div>
                 </>
@@ -557,7 +557,7 @@ export default function NewListing() {
                 <div className="calc">
                   <div className="sale">{listingCount}</div>
                   <div className="payout">
-                    maat{listingCount !== 1 ? "en" : ""} geselecteerd
+                    size{listingCount !== 1 ? "s" : ""} selected
                   </div>
                 </div>
               )}
@@ -568,12 +568,12 @@ export default function NewListing() {
               <table>
                 <thead>
                   <tr>
-                    <th>Maat (EU)</th>
-                    <th className="num">Storeprijs</th>
-                    <th className="num">Max payout</th>
-                    <th className="num">Jouw payout (€)</th>
-                    <th className="num">Verkoopprijs</th>
-                    <th className="num">Aantal</th>
+                    <th>Size (EU)</th>
+                    <th className="num">Store Price</th>
+                    <th className="num">Max Payout</th>
+                    <th className="num">Your Payout (€)</th>
+                    <th className="num">Sale Price</th>
+                    <th className="num">Qty</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -659,7 +659,7 @@ export default function NewListing() {
             </div>
 
             <p className="hint" style={{ marginBottom: 16 }}>
-              Laat een veld leeg om die maat over te slaan. De verkoopprijs wordt live berekend.
+              Leave a field empty to skip that size. The sale price is calculated live.
             </p>
 
             <button
@@ -669,10 +669,10 @@ export default function NewListing() {
               type="button"
             >
               {submitting
-                ? "Plaatsen…"
+                ? "Submitting…"
                 : listingCount === 0
-                ? "Vul minimaal één payout in"
-                : `Plaats ${listingCount} listing${listingCount !== 1 ? "s" : ""}`}
+                ? "Enter at least one payout"
+                : `Submit ${listingCount} listing${listingCount !== 1 ? "s" : ""}`}
             </button>
 
             <button
@@ -682,7 +682,7 @@ export default function NewListing() {
               type="button"
               style={{ marginTop: 8 }}
             >
-              ← Andere kleur kiezen
+              ← Choose a different colour
             </button>
           </>
         )}
