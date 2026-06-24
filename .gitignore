@@ -1,0 +1,27 @@
+# Next.js build output and cache
+.next/
+out/
+
+# Node modules
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Data directory (runtime JSON store)
+data/
+
+# OS / editor artifacts
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# TypeScript incremental build info
+*.tsbuildinfo
