@@ -63,7 +63,7 @@ export default async function Dashboard() {
   const pendingSum = payouts.filter((p) => p.status === "PENDING").reduce((s, p) => s + p.amount, 0);
   const paidSum = payouts.filter((p) => p.status === "PAID").reduce((s, p) => s + p.amount, 0);
 
-  const groups = groupListings(listings);
+  const groups = groupListings(listings.filter((l) => l.status !== "DELISTED"));
 
   return (
     <main className="page container">
@@ -124,7 +124,6 @@ export default async function Dashboard() {
                         {[
                           g.active > 0 && `${g.active} LIVE`,
                           g.sold > 0 && `${g.sold} SOLD`,
-                          g.delisted > 0 && `${g.delisted} OFFLINE`,
                         ]
                           .filter(Boolean)
                           .join(", ")}

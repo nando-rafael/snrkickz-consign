@@ -143,7 +143,7 @@ export default async function AdminPage() {
 
       <SalesSection initialListings={soldListings} />
 
-      <ListingsSection initialListings={listings} />
+      <ListingsSection initialListings={active} />
     </main>
   );
 }
