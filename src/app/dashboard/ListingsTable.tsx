@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import type { Listing } from "@/lib/db";
 import { euro } from "@/lib/config";
+import BulkListingsToolbar from "@/components/BulkListingsToolbar";
+import BulkPriceEditModal from "@/components/BulkPriceEditModal";
 
 type ListingGroup = {
   key: string;
@@ -55,10 +57,25 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
   const [groups, setGroups] = useState<ListingGroup[]>(initialGroups);
   const [page, setPage] = useState(1);
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const itemsPerPage = 10;
   const totalPages = Math.max(1, Math.ceil(groups.length / itemsPerPage));
   const start = (page - 1) * itemsPerPage;
   const paginatedGroups = groups.slice(start, start + itemsPerPage);
+
+  // Collect all active listing IDs across all groups
+  const allActiveListings = groups.flatMap((g) =>
+    g.listings.filter((l) => l.status === "ACTIVE")
+  );
+  const allActiveIds = allActiveListings.map((l) => l.id);
+  const selectedArray = Array.from(selectedIds);
+  const allActiveSelected =
+    allActiveIds.length > 0 && allActiveIds.every((id) => selectedIds.has(id));
 
   // Auto-refresh listings every 5 seconds to catch new listings
   useEffect(() => {
@@ -86,6 +103,73 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
     }
   }, [groups.length, itemsPerPage, page]);
 
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedIds(new Set(allActiveIds));
+    } else {
+      setSelectedIds(new Set());
+    }
+  }
+
+  async function handleBulkDelist() {
+    if (selectedArray.length === 0) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delist ${selectedArray.length} listing(s)?`
+    );
+    if (!confirmed) return;
+
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/listings/bulk/delist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingIds: selectedArray }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSuccessMsg(`Error: ${data.error || "Bulk delist failed."}`);
+      } else {
+        // Update local state
+        setGroups((prev) =>
+          prev.map((g) => ({
+            ...g,
+            listings: g.listings.map((l) =>
+              selectedIds.has(l.id) ? { ...l, status: "DELISTED" as const } : l
+            ),
+            active: g.listings.filter(
+              (l) => l.status === "ACTIVE" && !selectedIds.has(l.id)
+            ).length,
+          }))
+        );
+        setSelectedIds(new Set());
+        setSuccessMsg(
+          `${data.delistedCount} listing(s) delisted ✓${data.errors ? ` (${data.errors.length} error(s))` : ""}`
+        );
+        setTimeout(() => setSuccessMsg(null), 5000);
+      }
+    } catch {
+      setSuccessMsg("Network error during bulk delist. Please try again.");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  function handleBulkPriceSuccess(updated: number) {
+    setShowBulkPriceModal(false);
+    setSelectedIds(new Set());
+    setSuccessMsg(`${updated} listing(s) updated ✓`);
+    setTimeout(() => setSuccessMsg(null), 5000);
+  }
+
   if (groups.length === 0) {
     return (
       <div className="empty">
@@ -96,9 +180,37 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
 
   return (
     <>
+      {successMsg && (
+        <div
+          style={{
+            background: "rgba(111, 212, 154, 0.08)",
+            border: "1px solid rgba(111, 212, 154, 0.35)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 12,
+            color: "var(--green)",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {successMsg}
+        </div>
+      )}
+
+      <BulkListingsToolbar
+        totalCount={allActiveIds.length}
+        selectedCount={selectedIds.size}
+        allSelected={allActiveSelected}
+        onSelectAll={handleSelectAll}
+        onBulkDelist={handleBulkDelist}
+        onBulkPriceEdit={() => setShowBulkPriceModal(true)}
+        loading={bulkLoading}
+      />
+
       <table>
         <thead>
           <tr>
+            <th style={{ width: 36 }}></th>
             <th>Product</th>
             <th>SKU</th>
             <th>Size</th>
@@ -113,6 +225,7 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
           <tbody key={g.key}>
             {/* Group summary row */}
             <tr>
+              <td />
               <td>
                 <div className="prod">
                   {g.productImage && <img src={g.productImage} alt="" />}
@@ -146,11 +259,26 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
             {g.listings.map((l) => (
               <tr
                 key={l.id}
-                style={{ background: "var(--panel-2)", fontSize: 12 }}
+                style={{
+                  background: selectedIds.has(l.id)
+                    ? "rgba(59,130,246,0.06)"
+                    : "var(--panel-2)",
+                  fontSize: 12,
+                }}
               >
+                <td style={{ textAlign: "center" }}>
+                  {l.status === "ACTIVE" && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(l.id)}
+                      onChange={() => toggleSelect(l.id)}
+                      style={{ width: 15, height: 15, cursor: "pointer" }}
+                    />
+                  )}
+                </td>
                 <td
                   colSpan={5}
-                  style={{ paddingLeft: 32, color: "var(--muted)" }}
+                  style={{ paddingLeft: 16, color: "var(--muted)" }}
                 >
                   #{l.id} — listed {l.created_at.slice(0, 10)}
                   {l.order_name && ` · ${l.order_name}`}
@@ -222,6 +350,14 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
             Next →
           </button>
         </div>
+      )}
+
+      {showBulkPriceModal && selectedArray.length > 0 && (
+        <BulkPriceEditModal
+          listingIds={selectedArray}
+          onClose={() => setShowBulkPriceModal(false)}
+          onSuccess={handleBulkPriceSuccess}
+        />
       )}
     </>
   );
