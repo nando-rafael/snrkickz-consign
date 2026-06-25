@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Listing } from "@/lib/db";
 import PriceOverrideModal from "./PriceOverrideModal";
+import BulkListingsToolbar from "@/components/BulkListingsToolbar";
+import BulkPriceEditModal from "@/components/BulkPriceEditModal";
 
 type ListingWithConsigner = Listing & {
   consigner_name: string;
@@ -46,6 +48,11 @@ export default function ListingsSection({ initialListings }: Props) {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
   const [page, setPage] = useState(1);
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [showBulkPriceModal, setShowBulkPriceModal] = useState(false);
 
   function handleOverrideSuccess(listingId: number, newPrice: number) {
     setListings((prev) =>
@@ -94,6 +101,77 @@ export default function ListingsSection({ initialListings }: Props) {
     }
   }
 
+  // Bulk selection helpers
+  const activeListingIds = listings
+    .filter((l) => l.status === "ACTIVE")
+    .map((l) => l.id);
+  const selectedArray = Array.from(selectedIds);
+  const allActiveSelected =
+    activeListingIds.length > 0 &&
+    activeListingIds.every((id) => selectedIds.has(id));
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleSelectAll(checked: boolean) {
+    if (checked) {
+      setSelectedIds(new Set(activeListingIds));
+    } else {
+      setSelectedIds(new Set());
+    }
+  }
+
+  async function handleBulkDelist() {
+    if (selectedArray.length === 0) return;
+    const confirmed = window.confirm(
+      `Weet je zeker dat je ${selectedArray.length} listing(s) wilt delisten?`
+    );
+    if (!confirmed) return;
+
+    setBulkLoading(true);
+    try {
+      const res = await fetch("/api/listings/bulk/delist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingIds: selectedArray }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSuccessMsg(`Fout: ${data.error || "Bulk delist mislukt."}`);
+      } else {
+        setListings((prev) =>
+          prev.map((l) =>
+            selectedIds.has(l.id) ? { ...l, status: "DELISTED" } : l
+          )
+        );
+        setSelectedIds(new Set());
+        setSuccessMsg(
+          `${data.delistedCount} listing(s) gedelisted ✓${data.errors ? ` (${data.errors.length} fout(en))` : ""}`
+        );
+        setTimeout(() => setSuccessMsg(null), 5000);
+        router.refresh();
+      }
+    } catch {
+      setSuccessMsg("Netwerkfout bij bulk delist. Probeer opnieuw.");
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  function handleBulkPriceSuccess(updated: number) {
+    setShowBulkPriceModal(false);
+    setSelectedIds(new Set());
+    setSuccessMsg(`${updated} listing(s) bijgewerkt ✓`);
+    setTimeout(() => setSuccessMsg(null), 5000);
+    router.refresh();
+  }
+
   const filtered = listings.filter((l) => {
     if (filter === "lowest") {
       const lowestOnVariant = Math.min(
@@ -140,7 +218,7 @@ export default function ListingsSection({ initialListings }: Props) {
         </div>
       )}
 
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         <select
           value={filter}
           onChange={(e) => {
@@ -163,6 +241,16 @@ export default function ListingsSection({ initialListings }: Props) {
         </select>
       </div>
 
+      <BulkListingsToolbar
+        totalCount={activeListingIds.length}
+        selectedCount={selectedIds.size}
+        allSelected={allActiveSelected}
+        onSelectAll={handleSelectAll}
+        onBulkDelist={handleBulkDelist}
+        onBulkPriceEdit={() => setShowBulkPriceModal(true)}
+        loading={bulkLoading}
+      />
+
       <div className="table-wrap">
         {filtered.length === 0 ? (
           <div className="empty">Geen listings gevonden.</div>
@@ -170,6 +258,7 @@ export default function ListingsSection({ initialListings }: Props) {
           <table>
             <thead>
               <tr>
+                <th style={{ width: 36 }}></th>
                 <th>Product</th>
                 <th>SKU</th>
                 <th>Maat</th>
@@ -185,7 +274,17 @@ export default function ListingsSection({ initialListings }: Props) {
             </thead>
             <tbody>
               {paginatedListings.map((l) => (
-                <tr key={l.id}>
+                <tr key={l.id} style={selectedIds.has(l.id) ? { background: "rgba(59,130,246,0.06)" } : undefined}>
+                  <td style={{ textAlign: "center" }}>
+                    {l.status === "ACTIVE" && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(l.id)}
+                        onChange={() => toggleSelect(l.id)}
+                        style={{ width: 15, height: 15, cursor: "pointer" }}
+                      />
+                    )}
+                  </td>
                   <td>
                     <div className="prod">
                       {l.product_image && <img src={l.product_image} alt="" />}
@@ -430,6 +529,14 @@ export default function ListingsSection({ initialListings }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {showBulkPriceModal && selectedArray.length > 0 && (
+        <BulkPriceEditModal
+          listingIds={selectedArray}
+          onClose={() => setShowBulkPriceModal(false)}
+          onSuccess={handleBulkPriceSuccess}
+        />
       )}
     </>
   );
