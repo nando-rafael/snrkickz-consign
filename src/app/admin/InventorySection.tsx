@@ -20,6 +20,9 @@ export default function InventorySection({ initialItems }: Props) {
   // ── Item list (optimistic local state) ──────────────────────
   const [items, setItems] = useState<Inventory[]>(initialItems);
 
+  // ── Pagination ───────────────────────────────────────────────
+  const [page, setPage] = useState(1);
+
   // ── Add form ─────────────────────────────────────────────────
   const [showAddForm, setShowAddForm] = useState(false);
   const [addSku, setAddSku] = useState("");
@@ -144,6 +147,12 @@ export default function InventorySection({ initialItems }: Props) {
     }
   }
 
+  // ── Pagination derived values ────────────────────────────────
+  const itemsPerPage = 50;
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const start = (page - 1) * itemsPerPage;
+  const paginatedItems = items.slice(start, start + itemsPerPage);
+
   // ── Render ───────────────────────────────────────────────────
   return (
     <>
@@ -232,7 +241,7 @@ export default function InventorySection({ initialItems }: Props) {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {paginatedItems.map((item) => (
                 <tr key={item.id}>
                   <td>{item.product_title}</td>
                   <td><span className="sku">{item.sku}</span></td>
@@ -265,6 +274,36 @@ export default function InventorySection({ initialItems }: Props) {
           </table>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            marginTop: 16,
+            fontSize: 13,
+          }}
+        >
+          <button
+            className="btn sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            ← Previous
+          </button>
+          <span style={{ color: "var(--muted)" }}>
+            Page {page} of {totalPages}
+          </span>
+          <button
+            className="btn sm"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       {/* Upload-to-listing modal */}
       {toListing && (() => {
