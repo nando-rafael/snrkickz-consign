@@ -11,10 +11,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  // Fetch all records — pass a very high limit to bypass the default 200-row cap
-  const allListings = listingsTable.listAll(Number.MAX_SAFE_INTEGER);
+  // Fetch all records
+  const allListings = listingsTable.listAll();
   const allConsigners = consignersTable.listAll();
-  const allPayouts = payoutsTable.listAll(Number.MAX_SAFE_INTEGER);
+  const allPayouts = payoutsTable.listAll();
 
   // Status breakdown
   const statusCounts: Record<string, number> = {};
