@@ -41,6 +41,7 @@ export default function ListingsSection({ initialListings }: Props) {
   const [overrideTarget, setOverrideTarget] = useState<ListingWithConsigner | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
+  const [page, setPage] = useState(1);
 
   function handleOverrideSuccess(listingId: number, newPrice: number) {
     setListings((prev) =>
@@ -74,6 +75,11 @@ export default function ListingsSection({ initialListings }: Props) {
     return true;
   });
 
+  const itemsPerPage = 50;
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const start = (page - 1) * itemsPerPage;
+  const paginatedListings = filtered.slice(start, start + itemsPerPage);
+
   return (
     <>
       <h2 className="section-title">Alle listings</h2>
@@ -98,7 +104,10 @@ export default function ListingsSection({ initialListings }: Props) {
       <div style={{ marginBottom: 12 }}>
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value as "all" | "lowest" | "undercut")}
+          onChange={(e) => {
+            setFilter(e.target.value as "all" | "lowest" | "undercut");
+            setPage(1);
+          }}
           style={{
             background: "var(--card)",
             border: "1px solid var(--border)",
@@ -136,7 +145,7 @@ export default function ListingsSection({ initialListings }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((l) => (
+              {paginatedListings.map((l) => (
                 <tr key={l.id}>
                   <td>
                     <div className="prod">
@@ -254,6 +263,36 @@ export default function ListingsSection({ initialListings }: Props) {
           </table>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            marginTop: 16,
+            fontSize: 13,
+          }}
+        >
+          <button
+            className="btn sm"
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            ← Previous
+          </button>
+          <span style={{ color: "var(--muted)" }}>
+            Page {page} of {totalPages}
+          </span>
+          <button
+            className="btn sm"
+            disabled={page === totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       {overrideTarget && (
         <PriceOverrideModal
