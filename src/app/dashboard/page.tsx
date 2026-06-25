@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { listingsTable, payoutsTable, productRequestsTable, Listing } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { euro } from "@/lib/config";
+import ListingsTable from "./ListingsTable";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,6 @@ type ListingGroup = {
   total: number;
   active: number;
   sold: number;
-  delisted: number;
   listings: Listing[];
 };
 
@@ -36,7 +36,6 @@ function groupListings(listings: Listing[]): ListingGroup[] {
         total: 0,
         active: 0,
         sold: 0,
-        delisted: 0,
         listings: [],
       });
     }
@@ -44,7 +43,6 @@ function groupListings(listings: Listing[]): ListingGroup[] {
     g.total++;
     if (l.status === "ACTIVE") g.active++;
     else if (l.status === "SOLD") g.sold++;
-    else g.delisted++;
     g.listings.push(l);
   }
   return Array.from(map.values());
@@ -63,7 +61,8 @@ export default async function Dashboard() {
   const pendingSum = payouts.filter((p) => p.status === "PENDING").reduce((s, p) => s + p.amount, 0);
   const paidSum = payouts.filter((p) => p.status === "PAID").reduce((s, p) => s + p.amount, 0);
 
-  const groups = groupListings(listings.filter((l) => l.status !== "DELISTED"));
+  const nonDelisted = listings.filter((l) => l.status !== "DELISTED");
+  const groups = groupListings(nonDelisted);
 
   return (
     <main className="page container">
@@ -87,88 +86,7 @@ export default async function Dashboard() {
 
       <h2 className="section-title">Listings</h2>
       <div className="table-wrap">
-        {groups.length === 0 ? (
-          <div className="empty">No listings yet. Add your first pair via "New Listing".</div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>SKU</th>
-                <th>Size</th>
-                <th>Payout</th>
-                <th>Sale Price</th>
-                <th>Qty</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map((g) => (
-                <>
-                  {/* Group summary row */}
-                  <tr key={g.key}>
-                    <td>
-                      <div className="prod">
-                        {g.productImage && <img src={g.productImage} alt="" />}
-                        <span className="t">{g.productTitle}</span>
-                      </div>
-                    </td>
-                    <td><span className="sku">{g.sku}</span></td>
-                    <td><span className="size-chip">EU {g.size}</span></td>
-                    <td className="num">{euro(g.payout)}</td>
-                    <td className="num">{euro(g.salePrice)}</td>
-                    <td className="num" style={{ fontWeight: 600 }}>{g.total}x</td>
-                    <td>
-                      <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                        {[
-                          g.active > 0 && `${g.active} LIVE`,
-                          g.sold > 0 && `${g.sold} SOLD`,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </span>
-                    </td>
-                    <td />
-                  </tr>
-                  {/* Individual listing rows (expanded) */}
-                  {g.listings.map((l) => (
-                    <tr key={l.id} style={{ background: "var(--panel-2)", fontSize: 12 }}>
-                      <td colSpan={5} style={{ paddingLeft: 32, color: "var(--muted)" }}>
-                        #{l.id} — listed {l.created_at.slice(0, 10)}
-                        {l.order_name && ` · ${l.order_name}`}
-                      </td>
-                      <td />
-                      <td>
-                        <span className={`status ${l.status}`}>
-                          {l.status === "ACTIVE" ? "Live" : l.status === "SOLD" ? "Sold" : "Offline"}
-                        </span>
-                      </td>
-                      <td>
-                        {l.status === "ACTIVE" && (
-                          <form action={`/api/listings/${l.id}/delist`} method="post">
-                            <button className="btn danger sm" type="submit">Delist</button>
-                          </form>
-                        )}
-                        {l.status === "SOLD" && l.shipping_label_url && (
-                          <a
-                            href={`/api/labels/${l.shipping_label_url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn sm"
-                            style={{ background: "rgba(96,165,250,0.15)", color: "#60a5fa" }}
-                          >
-                            Shipping Label ↗
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <ListingsTable initialGroups={groups} totalListings={nonDelisted.length} />
       </div>
 
       <h2 className="section-title">Payouts</h2>
