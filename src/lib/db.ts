@@ -69,13 +69,26 @@ export type ProductRequest = {
   handled_at: string | null;
 };
 
+export type WebhookLog = {
+  id: number;
+  event_type: string;
+  order_name: string | null;
+  status: "SUCCESS" | "FAILED" | "PENDING_RETRY";
+  matched_count: number;
+  error_message: string | null;
+  raw_payload: string;
+  created_at: string;
+  retry_count: number;
+};
+
 type Store = {
   consigners: Consigner[];
   listings: Listing[];
   payouts: Payout[];
   inventory: Inventory[];
   productRequests: ProductRequest[];
-  nextId: { consigner: number; listing: number; payout: number; inventory: number; productRequest: number };
+  webhookLogs: WebhookLog[];
+  nextId: { consigner: number; listing: number; payout: number; inventory: number; productRequest: number; webhookLog: number };
 };
 
 const empty: Store = {
@@ -84,7 +97,8 @@ const empty: Store = {
   payouts: [],
   inventory: [],
   productRequests: [],
-  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1, productRequest: 1 },
+  webhookLogs: [],
+  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1, productRequest: 1, webhookLog: 1 },
 };
 
 function load(): Store {
@@ -98,12 +112,14 @@ function load(): Store {
       payouts: parsed.payouts ?? [],
       inventory: parsed.inventory ?? [],
       productRequests: parsed.productRequests ?? [],
+      webhookLogs: parsed.webhookLogs ?? [],
       nextId: {
         consigner: parsed.nextId?.consigner ?? 1,
         listing: parsed.nextId?.listing ?? 1,
         payout: parsed.nextId?.payout ?? 1,
         inventory: parsed.nextId?.inventory ?? 1,
         productRequest: parsed.nextId?.productRequest ?? 1,
+        webhookLog: parsed.nextId?.webhookLog ?? 1,
       },
     };
   } catch {
@@ -209,11 +225,10 @@ export const listingsTable = {
       .listings.filter((l) => l.consigner_id === consignerId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-  listAll(limit = 200): Listing[] {
+  listAll(): Listing[] {
     return getStore()
       .listings.slice()
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-      .slice(0, limit);
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
   findActiveByVariantLowestPayout(variantId: string): Listing | undefined {
     return getStore()
@@ -314,14 +329,13 @@ export const payoutsTable = {
       .payouts.filter((p) => p.consigner_id === consignerId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-  listAll(limit = 200): Payout[] {
+  listAll(): Payout[] {
     return getStore()
       .payouts.slice()
       .sort((a, b) => {
         if (a.status !== b.status) return a.status === "PENDING" ? -1 : 1;
         return b.created_at.localeCompare(a.created_at);
-      })
-      .slice(0, limit);
+      });
   },
   markPaid(id: number): void {
     const store = getStore();
@@ -379,6 +393,41 @@ export const productRequestsTable = {
         r.sku.toUpperCase() === sku.toUpperCase() &&
         (r.status === "PENDING" || r.status === "APPROVED")
     );
+  },
+};
+
+// ── Webhook Logs ─────────────────────────────────────────────
+export const webhookLogsTable = {
+  insert(input: Omit<WebhookLog, "id" | "created_at">): WebhookLog {
+    const store = getStore();
+    const row: WebhookLog = {
+      id: store.nextId.webhookLog++,
+      created_at: new Date().toISOString(),
+      ...input,
+    };
+    store.webhookLogs.push(row);
+    save(store);
+    return row;
+  },
+
+  listFailed(): WebhookLog[] {
+    return getStore().webhookLogs.filter(
+      (w) => w.status === "FAILED" || w.status === "PENDING_RETRY"
+    );
+  },
+
+  updateStatus(
+    id: number,
+    status: WebhookLog["status"],
+    errorMessage?: string
+  ): void {
+    const store = getStore();
+    const log = store.webhookLogs.find((w) => w.id === id);
+    if (log) {
+      log.status = status;
+      if (errorMessage !== undefined) log.error_message = errorMessage;
+      save(store);
+    }
   },
 };
 
