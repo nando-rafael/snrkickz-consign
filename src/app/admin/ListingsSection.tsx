@@ -39,6 +39,10 @@ export default function ListingsSection({ initialListings }: Props) {
   const router = useRouter();
   const [listings, setListings] = useState<ListingWithConsigner[]>(initialListings);
   const [overrideTarget, setOverrideTarget] = useState<ListingWithConsigner | null>(null);
+  const [markSoldTarget, setMarkSoldTarget] = useState<ListingWithConsigner | null>(null);
+  const [orderName, setOrderName] = useState("");
+  const [markSoldLoading, setMarkSoldLoading] = useState(false);
+  const [markSoldError, setMarkSoldError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
   const [page, setPage] = useState(1);
@@ -53,6 +57,41 @@ export default function ListingsSection({ initialListings }: Props) {
     setSuccessMsg(`Verkoopprijs bijgewerkt naar ${euro(newPrice)} ✓`);
     setTimeout(() => setSuccessMsg(null), 4000);
     router.refresh();
+  }
+
+  async function submitMarkSold() {
+    if (!markSoldTarget || !orderName.trim()) return;
+    setMarkSoldLoading(true);
+    setMarkSoldError(null);
+    try {
+      const res = await fetch(`/api/admin/listings/${markSoldTarget.id}/mark-sold`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderName: orderName.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMarkSoldError(data.error || "Markeren als verkocht mislukt.");
+      } else {
+        const soldOrderName = orderName.trim();
+        setListings((prev) =>
+          prev.map((l) =>
+            l.id === markSoldTarget.id
+              ? { ...l, status: "SOLD", order_name: soldOrderName }
+              : l
+          )
+        );
+        setMarkSoldTarget(null);
+        setOrderName("");
+        setSuccessMsg(`Listing gemarkeerd als verkocht (${soldOrderName}) ✓`);
+        setTimeout(() => setSuccessMsg(null), 4000);
+        router.refresh();
+      }
+    } catch {
+      setMarkSoldError("Netwerkfout. Probeer opnieuw.");
+    } finally {
+      setMarkSoldLoading(false);
+    }
   }
 
   const filtered = listings.filter((l) => {
@@ -242,6 +281,21 @@ export default function ListingsSection({ initialListings }: Props) {
                           >
                             Pas prijs aan
                           </button>
+                          <button
+                            className="btn sm"
+                            type="button"
+                            onClick={() => {
+                              setMarkSoldTarget(l);
+                              setOrderName("");
+                              setMarkSoldError(null);
+                            }}
+                            style={{
+                              background: "rgba(111,212,154,0.15)",
+                              color: "var(--green)",
+                            }}
+                          >
+                            Mark Sold
+                          </button>
                           <form
                             action={`/api/listings/${l.id}/delist`}
                             method="post"
@@ -303,6 +357,79 @@ export default function ListingsSection({ initialListings }: Props) {
           onClose={() => setOverrideTarget(null)}
           onSuccess={(newPrice) => handleOverrideSuccess(overrideTarget.id, newPrice)}
         />
+      )}
+
+      {markSoldTarget && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setMarkSoldTarget(null);
+            }
+          }}
+        >
+          <div className="card" style={{ width: "100%", maxWidth: 420 }}>
+            <h2 className="page-title" style={{ fontSize: 17, marginBottom: 4 }}>
+              Markeer als verkocht
+            </h2>
+            <p className="page-sub" style={{ marginBottom: 20 }}>
+              Listing #{markSoldTarget.id} —{" "}
+              <strong>{markSoldTarget.product_title}</strong>
+              {markSoldTarget.size && (
+                <> &middot; maat <strong>{markSoldTarget.size}</strong></>
+              )}
+            </p>
+
+            {markSoldError && (
+              <div className="error" style={{ marginBottom: 12 }}>
+                {markSoldError}
+              </div>
+            )}
+
+            <div className="field">
+              <label htmlFor="order-name">Ordernaam</label>
+              <input
+                id="order-name"
+                type="text"
+                placeholder="bijv. #12345"
+                value={orderName}
+                onChange={(e) => setOrderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitMarkSold();
+                }}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button
+                className="btn"
+                type="button"
+                disabled={markSoldLoading || !orderName.trim()}
+                onClick={submitMarkSold}
+                style={{ flex: 1, background: "var(--green)", color: "#000" }}
+              >
+                {markSoldLoading ? "Bezig…" : "Mark Sold"}
+              </button>
+              <button
+                className="btn ghost"
+                type="button"
+                disabled={markSoldLoading}
+                onClick={() => setMarkSoldTarget(null)}
+              >
+                Annuleer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
