@@ -209,11 +209,10 @@ export const listingsTable = {
       .listings.filter((l) => l.consigner_id === consignerId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-  listAll(limit = 200): Listing[] {
+  listAll(): Listing[] {
     return getStore()
       .listings.slice()
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-      .slice(0, limit);
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
   findActiveByVariantLowestPayout(variantId: string): Listing | undefined {
     return getStore()
@@ -314,14 +313,13 @@ export const payoutsTable = {
       .payouts.filter((p) => p.consigner_id === consignerId)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-  listAll(limit = 200): Payout[] {
+  listAll(): Payout[] {
     return getStore()
       .payouts.slice()
       .sort((a, b) => {
         if (a.status !== b.status) return a.status === "PENDING" ? -1 : 1;
         return b.created_at.localeCompare(a.created_at);
-      })
-      .slice(0, limit);
+      });
   },
   markPaid(id: number): void {
     const store = getStore();
