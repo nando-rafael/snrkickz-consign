@@ -43,7 +43,10 @@ export default async function AdminPage() {
 
   const active = listings.filter((l) => l.status === "ACTIVE");
   const sold = listings.filter((l) => l.status === "SOLD");
-  const soldListings = sold;
+  const soldListings = sold.sort((a, b) => {
+    if (!a.sold_at || !b.sold_at) return 0;
+    return b.sold_at.localeCompare(a.sold_at);
+  });
   const pendingPayouts = payouts.filter((p) => p.status === "PENDING");
   const pendingSum = pendingPayouts.reduce((s, p) => s + p.amount, 0);
   const feeEarned = sold.reduce((s, l) => s + (l.sale_price - l.payout), 0);
