@@ -30,9 +30,8 @@ export async function POST(
     return NextResponse.json({ error: "Consignor niet gevonden" }, { status: 404 });
   }
 
-  let pdfBuffer: Buffer;
   try {
-    pdfBuffer = await generateShippingLabel({
+    const pdfBuffer = await generateShippingLabel({
       id: listing.id,
       sku: listing.sku,
       product_title: listing.product_title,
@@ -41,16 +40,21 @@ export async function POST(
       consigner_name: consigner.name,
       order_name: listing.order_name,
     });
-  } catch {
-    return NextResponse.json({ error: "Label genereren mislukt" }, { status: 500 });
+
+    const filename = `label-${listing.id}.pdf`;
+
+    return new NextResponse(pdfBuffer, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": pdfBuffer.length.toString(),
+      },
+    });
+  } catch (error: any) {
+    console.error("[Label Download] Error:", error);
+    return NextResponse.json(
+      { error: "Label genereren mislukt", message: error.message },
+      { status: 500 }
+    );
   }
-
-  const filename = `listing-${listing.id}-label.pdf`;
-
-  return new NextResponse(new Uint8Array(pdfBuffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-    },
-  });
 }
