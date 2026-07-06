@@ -6,22 +6,32 @@ import { euro } from "@/lib/config";
 import BulkListingsToolbar from "@/components/BulkListingsToolbar";
 import BulkPriceEditModal from "@/components/BulkPriceEditModal";
 
-async function downloadLabel(listingId: number) {
-  const res = await fetch(`/api/listings/${listingId}/label/download`, {
-    method: "POST",
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    alert(data.error || "Label download failed.");
-    return;
+async function downloadLabel(
+  listingId: number,
+  setDownloading: (id: number | null) => void
+) {
+  setDownloading(listingId);
+  try {
+    const res = await fetch(`/api/listings/${listingId}/label/download`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || "Label download failed.");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `label-${listingId}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    alert("Failed to download label");
+  } finally {
+    setDownloading(null);
   }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `listing-${listingId}-label.pdf`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 type ListingGroup = {
@@ -74,6 +84,7 @@ function groupListings(listings: Listing[]): ListingGroup[] {
 export default function ListingsTable({ initialGroups, totalListings }: Props) {
   const [groups, setGroups] = useState<ListingGroup[]>(initialGroups);
   const [page, setPage] = useState(1);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -319,17 +330,20 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
                       </button>
                     </form>
                   )}
-                  {l.status === "SOLD" && (
+                  {l.status === "SOLD" && l.shipping_label_url && (
                     <button
                       className="btn sm"
                       type="button"
-                      onClick={() => downloadLabel(l.id)}
+                      disabled={downloadingId === l.id}
+                      onClick={() => downloadLabel(l.id, setDownloadingId)}
                       style={{
-                        background: "rgba(96,165,250,0.15)",
-                        color: "#60a5fa",
+                        background: "rgba(111,212,154,0.15)",
+                        color: "var(--green)",
+                        opacity: downloadingId === l.id ? 0.6 : 1,
+                        cursor: downloadingId === l.id ? "wait" : "pointer",
                       }}
                     >
-                      Download Label ↓
+                      {downloadingId === l.id ? "Downloading…" : "📥 Download Label (A6)"}
                     </button>
                   )}
                 </td>
