@@ -6,6 +6,24 @@ import { euro } from "@/lib/config";
 import BulkListingsToolbar from "@/components/BulkListingsToolbar";
 import BulkPriceEditModal from "@/components/BulkPriceEditModal";
 
+async function downloadLabel(listingId: number) {
+  const res = await fetch(`/api/listings/${listingId}/label/download`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || "Label download failed.");
+    return;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `listing-${listingId}-label.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 type ListingGroup = {
   key: string;
   sku: string;
@@ -301,19 +319,18 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
                       </button>
                     </form>
                   )}
-                  {l.status === "SOLD" && l.shipping_label_url && (
-                    <a
-                      href={`/api/labels/${l.shipping_label_url}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  {l.status === "SOLD" && (
+                    <button
                       className="btn sm"
+                      type="button"
+                      onClick={() => downloadLabel(l.id)}
                       style={{
                         background: "rgba(96,165,250,0.15)",
                         color: "#60a5fa",
                       }}
                     >
-                      Shipping Label ↗
-                    </a>
+                      Download Label ↓
+                    </button>
                   )}
                 </td>
               </tr>

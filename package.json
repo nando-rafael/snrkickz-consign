@@ -11,12 +11,14 @@
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.6",
     "next": "^14.2.21",
+    "pdfkit": "^0.13.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.2",
+    "@types/pdfkit": "^0.13.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "typescript": "^5.7.2"

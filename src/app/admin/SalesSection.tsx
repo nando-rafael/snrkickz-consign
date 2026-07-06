@@ -4,6 +4,24 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Listing } from "@/lib/db";
 
+async function downloadLabel(listingId: number) {
+  const res = await fetch(`/api/listings/${listingId}/label/download`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || "Label downloaden mislukt.");
+    return;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `listing-${listingId}-label.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 type ListingWithConsigner = Listing & {
   consigner_name: string;
   consigner_email: string;
@@ -120,12 +138,20 @@ export default function SalesSection({ initialListings }: Props) {
           >
             {uploading ? "…" : "Wijzigen"}
           </button>
+          <button
+            className="btn sm"
+            type="button"
+            onClick={() => downloadLabel(l.id)}
+            style={{ background: "rgba(96,165,250,0.15)", color: "#60a5fa" }}
+          >
+            Download ↓
+          </button>
         </div>
       );
     }
 
     return (
-      <div style={{ display: "flex", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         {hiddenInput}
         <button
           className="btn sm"
@@ -135,6 +161,14 @@ export default function SalesSection({ initialListings }: Props) {
           style={{ background: "rgba(143,139,128,0.15)", color: "#8f8b80" }}
         >
           {uploading ? "Uploaden…" : "Label toevoegen"}
+        </button>
+        <button
+          className="btn sm"
+          type="button"
+          onClick={() => downloadLabel(l.id)}
+          style={{ background: "rgba(96,165,250,0.15)", color: "#60a5fa" }}
+        >
+          Download ↓
         </button>
       </div>
     );
