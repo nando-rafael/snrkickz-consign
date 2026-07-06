@@ -41,8 +41,14 @@ export async function POST(
       consigner_name: consigner.name,
       order_name: listing.order_name,
     });
-  } catch {
-    return NextResponse.json({ error: "Label genereren mislukt" }, { status: 500 });
+  } catch (e: any) {
+    console.error(`[Label Generation] Error for listing ${listing.id}:`, e);
+    console.error(`[Label Generation] Stack:`, e.stack);
+    return NextResponse.json({
+      error: "Label genereren mislukt",
+      details: e.message,
+      hint: "Probeer het later opnieuw of neem contact op met support",
+    }, { status: 500 });
   }
 
   const filename = `listing-${listing.id}-label.pdf`;
