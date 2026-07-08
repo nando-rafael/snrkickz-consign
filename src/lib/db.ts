@@ -378,5 +378,13 @@ export const productRequestsTable = {
         (r.status === "PENDING" || r.status === "APPROVED")
     );
   },
+  delete(id: number): boolean {
+    const store = getStore();
+    const index = store.productRequests.findIndex((r) => r.id === id);
+    if (index === -1) return false;
+    store.productRequests.splice(index, 1);
+    save(store);
+    return true;
+  },
 };
 
