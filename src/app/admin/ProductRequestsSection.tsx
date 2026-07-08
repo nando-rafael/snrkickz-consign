@@ -58,6 +58,35 @@ export default function ProductRequestsSection({ initialRequests }: Props) {
 
   const pendingCount = requests.filter((r) => r.status === "PENDING").length;
 
+  async function handleDelete(id: number) {
+    if (!window.confirm("Weet je zeker dat je deze request wilt verwijderen?")) {
+      return;
+    }
+
+    setActionError(null);
+    setSuccessMsg(null);
+    setLoadingId(id);
+    try {
+      const res = await fetch(`/api/admin/product-requests/${id}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || "Verwijderen mislukt.");
+      } else {
+        setRequests((prev) => prev.filter((r) => r.id !== id));
+        setSuccessMsg("Request verwijderd ✓");
+        setTimeout(() => setSuccessMsg(null), 3000);
+        router.refresh();
+      }
+    } catch {
+      setActionError("Netwerkfout. Probeer opnieuw.");
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
   async function handleAction(id: number, action: "approve" | "reject" | "live") {
     setActionError(null);
     setSuccessMsg(null);
@@ -191,6 +220,15 @@ export default function ProductRequestsSection({ initialRequests }: Props) {
                           Mark as live
                         </button>
                       )}
+                      <button
+                        className="btn danger sm"
+                        type="button"
+                        disabled={loadingId === r.id}
+                        onClick={() => handleDelete(r.id)}
+                        title="Verwijderen"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </td>
                 </tr>
