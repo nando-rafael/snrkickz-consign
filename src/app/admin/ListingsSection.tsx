@@ -232,27 +232,60 @@ export default function ListingsSection({ initialListings }: Props) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-        <input
-          type="text"
-          placeholder="Zoeken op SKU, product, consigner of ID..."
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setPage(1);
-          }}
-          style={{
-            background: "var(--card)",
-            border: "1px solid var(--border)",
-            borderRadius: 6,
-            color: "var(--fg)",
-            padding: "6px 10px",
-            fontSize: 13,
-            flex: 1,
-            minWidth: 200,
-          }}
-        />
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--muted)" }}>
+          🔍 Zoeken
+        </label>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            type="text"
+            placeholder="SKU, product, consigner of ID..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              color: "var(--fg)",
+              padding: "8px 12px",
+              fontSize: 13,
+              flex: 1,
+              minWidth: 200,
+            }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setPage(1);
+              }}
+              style={{
+                background: "var(--card)",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                color: "var(--muted)",
+                padding: "8px 12px",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              ✕ Wissen
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
+            {filtered.length} resultaat{filtered.length !== 1 ? "en" : ""} gevonden
+          </div>
+        )}
+      </div>
 
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         <select
           value={filter}
           onChange={(e) => {
@@ -264,12 +297,12 @@ export default function ListingsSection({ initialListings }: Props) {
             border: "1px solid var(--border)",
             borderRadius: 6,
             color: "var(--fg)",
-            padding: "6px 10px",
+            padding: "8px 10px",
             fontSize: 13,
             cursor: "pointer",
           }}
         >
-          <option value="all">Alle</option>
+          <option value="all">Alle listings</option>
           <option value="lowest">Alleen laagste</option>
           <option value="undercut">Alleen ondercut</option>
         </select>
