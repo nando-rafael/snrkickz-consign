@@ -47,6 +47,7 @@ export default function ListingsSection({ initialListings }: Props) {
   const [markSoldError, setMarkSoldError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
 
   // Bulk selection state
@@ -179,7 +180,7 @@ export default function ListingsSection({ initialListings }: Props) {
           .filter((x) => x.variant_id === l.variant_id && x.status === "ACTIVE")
           .map((x) => x.payout)
       );
-      return l.payout === lowestOnVariant;
+      if (l.payout !== lowestOnVariant) return false;
     }
     if (filter === "undercut") {
       const lowestOnVariant = Math.min(
@@ -187,8 +188,21 @@ export default function ListingsSection({ initialListings }: Props) {
           .filter((x) => x.variant_id === l.variant_id && x.status === "ACTIVE")
           .map((x) => x.payout)
       );
-      return l.payout > lowestOnVariant;
+      if (l.payout <= lowestOnVariant) return false;
     }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      const matchesSku = l.sku.toLowerCase().includes(query);
+      const matchesProduct = (l.product_title || "").toLowerCase().includes(query);
+      const matchesConsigner = l.consigner_name.toLowerCase().includes(query);
+      const matchesId = l.id.toString().includes(query);
+
+      if (!matchesSku && !matchesProduct && !matchesConsigner && !matchesId) {
+        return false;
+      }
+    }
+
     return true;
   });
 
@@ -219,6 +233,26 @@ export default function ListingsSection({ initialListings }: Props) {
       )}
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+        <input
+          type="text"
+          placeholder="Zoeken op SKU, product, consigner of ID..."
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setPage(1);
+          }}
+          style={{
+            background: "var(--card)",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            color: "var(--fg)",
+            padding: "6px 10px",
+            fontSize: 13,
+            flex: 1,
+            minWidth: 200,
+          }}
+        />
+
         <select
           value={filter}
           onChange={(e) => {
