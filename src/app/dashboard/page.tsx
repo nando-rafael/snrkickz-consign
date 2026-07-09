@@ -3,6 +3,7 @@ import { listingsTable, payoutsTable, productRequestsTable, Listing } from "@/li
 import { getSession } from "@/lib/auth";
 import { euro } from "@/lib/config";
 import ListingsTable from "./ListingsTable";
+import ProductRequestsSection from "./ProductRequestsSection";
 
 export const dynamic = "force-dynamic";
 
@@ -110,55 +111,7 @@ export default async function Dashboard() {
         )}
       </div>
 
-      <h2 className="section-title">My Product Requests</h2>
-      <div className="table-wrap">
-        {productRequests.length === 0 ? (
-          <div className="empty">You haven't submitted any product requests yet.</div>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Product Name</th>
-                <th>Status</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productRequests.map((r) => (
-                <tr key={r.id}>
-                  <td><span className="sku">{r.sku}</span></td>
-                  <td>{r.product_name}</td>
-                  <td>
-                    <span
-                      style={{
-                        display: "inline-block",
-                        background:
-                          r.status === "PENDING" ? "rgba(160,160,160,0.15)" :
-                          r.status === "APPROVED" ? "rgba(59,130,246,0.15)" :
-                          r.status === "LIVE" ? "rgba(111,212,154,0.15)" :
-                          "rgba(224,112,112,0.15)",
-                        color:
-                          r.status === "PENDING" ? "var(--muted)" :
-                          r.status === "APPROVED" ? "#60a5fa" :
-                          r.status === "LIVE" ? "var(--green)" :
-                          "#e87070",
-                        padding: "3px 8px",
-                        borderRadius: 4,
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
-                  <td>{r.created_at.slice(0, 10)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <ProductRequestsSection initialRequests={productRequests} />
     </main>
   );
 }
