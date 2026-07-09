@@ -6,6 +6,7 @@ import InventorySection from "./InventorySection";
 import ProductRequestsSection from "./ProductRequestsSection";
 import ListingsSection from "./ListingsSection";
 import SalesSection from "./SalesSection";
+import ConsignersSection from "./ConsignersSection";
 
 export const dynamic = "force-dynamic";
 
@@ -78,43 +79,7 @@ export default async function AdminPage() {
 
       <ProductRequestsSection initialRequests={allProductRequests} />
 
-      <h2 className="section-title">Consigners ({consigners.length})</h2>
-      <div className="table-wrap">
-        {consigners.length === 0 ? <div className="empty">Geen consigners gevonden.</div> : (
-          <table>
-            <thead>
-              <tr>
-                <th>Naam</th>
-                <th>Email</th>
-                <th>IBAN</th>
-                <th>Discord</th>
-                <th>Webhook URL</th>
-                <th>Live</th>
-                <th>Verkocht</th>
-                <th>Uitbetaling</th>
-              </tr>
-            </thead>
-            <tbody>
-              {consigners.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td><span className="size-chip">{c.email}</span></td>
-                  <td><span className="size-chip">{c.iban || "—"}</span></td>
-                  <td><span className="size-chip">{c.discord_username || "—"}</span></td>
-                  <td>
-                    {c.discord_webhook_url
-                      ? <span className="size-chip" title={c.discord_webhook_url}>✓ ingesteld</span>
-                      : <span className="size-chip">—</span>}
-                  </td>
-                  <td className="num">{c.activeCount}</td>
-                  <td className="num">{c.soldCount}</td>
-                  <td className="num">{c.pendingPayout > 0 ? euro(c.pendingPayout) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <ConsignersSection initialConsigners={consigners} />
 
       <InventorySection initialItems={inventory} />
 
