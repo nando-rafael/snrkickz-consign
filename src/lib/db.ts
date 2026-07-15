@@ -12,6 +12,8 @@ export type Consigner = {
   iban: string | null;
   discord_username: string | null;
   discord_webhook_url: string | null;
+  password_reset_token?: string | null;
+  password_reset_expires?: string | null;
   created_at: string;
 };
 
