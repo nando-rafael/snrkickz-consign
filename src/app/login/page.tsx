@@ -43,6 +43,9 @@ export default async function LoginPage({
           </button>
         </form>
         <p className="auth-foot">
+          <a href="/forgot-password">Wachtwoord vergeten?</a>
+        </p>
+        <p className="auth-foot">
           Nog geen account? <a href="/register">Registreren</a>
         </p>
       </div>
