@@ -167,6 +167,14 @@ export const consignersTable = {
       .consigners.slice()
       .sort((a, b) => a.name.localeCompare(b.name));
   },
+  delete(id: number): boolean {
+    const store = getStore();
+    const index = store.consigners.findIndex((c) => c.id === id);
+    if (index === -1) return false;
+    store.consigners.splice(index, 1);
+    save(store);
+    return true;
+  },
 };
 
 // ── Listings ─────────────────────────────────────────────────
