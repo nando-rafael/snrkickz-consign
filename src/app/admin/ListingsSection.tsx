@@ -253,6 +253,23 @@ export default function ListingsSection({ initialListings }: Props) {
         </div>
       )}
 
+      {actionError && (
+        <div
+          style={{
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.35)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 12,
+            color: "#ef4444",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {actionError}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         <input
           type="text"
