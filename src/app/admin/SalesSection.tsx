@@ -44,11 +44,37 @@ export default function SalesSection({ initialListings }: Props) {
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [notifyingId, setNotifyingId] = useState<number | null>(null);
   const fileInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   function showSuccess(msg: string) {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 4000);
+  }
+
+  async function handleResendNotification(listing: ListingWithConsigner) {
+    if (!window.confirm(`Melding opnieuw verzenden naar ${listing.consigner_name}?`)) {
+      return;
+    }
+
+    setNotifyingId(listing.id);
+    try {
+      const res = await fetch(`/api/admin/listings/${listing.id}/resend-notification`, {
+        method: "POST",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Melding verzenden mislukt.");
+      } else {
+        showSuccess(`Melding verzonden naar ${listing.consigner_name} ✓`);
+        router.refresh();
+      }
+    } catch {
+      alert("Netwerkfout. Probeer opnieuw.");
+    } finally {
+      setNotifyingId(null);
+    }
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>, listingId: number) {
@@ -211,6 +237,7 @@ export default function SalesSection({ initialListings }: Props) {
                 <th>Payout</th>
                 <th>Marge</th>
                 <th>Label</th>
+                <th>Melding</th>
               </tr>
             </thead>
             <tbody>
@@ -254,6 +281,21 @@ export default function SalesSection({ initialListings }: Props) {
                     {euro((l.sale_price_override ?? l.sale_price) - l.payout)}
                   </td>
                   <td>{renderLabelCell(l)}</td>
+                  <td>
+                    <button
+                      className="btn sm"
+                      type="button"
+                      disabled={notifyingId === l.id}
+                      onClick={() => handleResendNotification(l)}
+                      title="Discord melding opnieuw verzenden"
+                      style={{
+                        background: "rgba(168,85,247,0.15)",
+                        color: "#a855f7",
+                      }}
+                    >
+                      {notifyingId === l.id ? "Verzenden…" : "🔔"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
