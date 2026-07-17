@@ -46,6 +46,8 @@ export default function ListingsSection({ initialListings }: Props) {
   const [markSoldLoading, setMarkSoldLoading] = useState(false);
   const [markSoldError, setMarkSoldError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -99,6 +101,33 @@ export default function ListingsSection({ initialListings }: Props) {
       setMarkSoldError("Netwerkfout. Probeer opnieuw.");
     } finally {
       setMarkSoldLoading(false);
+    }
+  }
+
+  async function handleResendDiscord(id: number, orderName: string) {
+    if (!window.confirm(`Discord notificatie opnieuw verzenden voor ${orderName}?`)) {
+      return;
+    }
+
+    setActionError(null);
+    setSuccessMsg(null);
+    setLoadingId(id);
+    try {
+      const res = await fetch(`/api/admin/listings/${id}/resend-discord`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setActionError(data.error || "Resend mislukt");
+      } else {
+        setSuccessMsg(`Discord notificatie verzonden ✓`);
+        setTimeout(() => setSuccessMsg(null), 3000);
+      }
+    } catch {
+      setActionError("Netwerkfout. Probeer opnieuw.");
+    } finally {
+      setLoadingId(null);
     }
   }
 
@@ -229,6 +258,23 @@ export default function ListingsSection({ initialListings }: Props) {
           }}
         >
           {successMsg}
+        </div>
+      )}
+
+      {actionError && (
+        <div
+          style={{
+            background: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.35)",
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 12,
+            color: "#ef4444",
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {actionError}
         </div>
       )}
 
@@ -441,6 +487,21 @@ export default function ListingsSection({ initialListings }: Props) {
                       )}
                       {l.status === "SOLD" && l.order_name && (
                         <span className="size-chip">{l.order_name}</span>
+                      )}
+                      {l.status === "SOLD" && (
+                        <button
+                          className="btn sm"
+                          type="button"
+                          disabled={loadingId === l.id}
+                          onClick={() => handleResendDiscord(l.id, l.order_name || "Onbekend")}
+                          title="Discord notificatie opnieuw verzenden"
+                          style={{
+                            background: "rgba(88, 101, 242, 0.15)",
+                            color: "#5865F2",
+                          }}
+                        >
+                          💬 Discord
+                        </button>
                       )}
                     </div>
                   </td>
