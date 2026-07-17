@@ -46,6 +46,7 @@ export default function ListingsSection({ initialListings }: Props) {
   const [markSoldLoading, setMarkSoldLoading] = useState(false);
   const [markSoldError, setMarkSoldError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [discordLoading, setDiscordLoading] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -99,6 +100,26 @@ export default function ListingsSection({ initialListings }: Props) {
       setMarkSoldError("Netwerkfout. Probeer opnieuw.");
     } finally {
       setMarkSoldLoading(false);
+    }
+  }
+
+  async function handleResendDiscord(id: number) {
+    setDiscordLoading(id);
+    try {
+      const res = await fetch(`/api/admin/listings/${id}/resend-discord`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSuccessMsg(`❌ Discord fout: ${data.error}`);
+      } else {
+        setSuccessMsg(`✓ Discord notification hergestuurd naar consignor`);
+      }
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch {
+      setSuccessMsg(`❌ Netwerkfout. Probeer opnieuw.`);
+    } finally {
+      setDiscordLoading(null);
     }
   }
 
@@ -441,6 +462,18 @@ export default function ListingsSection({ initialListings }: Props) {
                       )}
                       {l.status === "SOLD" && l.order_name && (
                         <span className="size-chip">{l.order_name}</span>
+                      )}
+                      {l.status === "SOLD" && (
+                        <button
+                          className="btn sm"
+                          type="button"
+                          disabled={discordLoading === l.id}
+                          onClick={() => handleResendDiscord(l.id)}
+                          style={{ background: "rgba(88,101,242,0.2)", color: "#5865f2" }}
+                          title="Discord notification opnieuw versturen"
+                        >
+                          {discordLoading === l.id ? "Bezig..." : "📢 Discord"}
+                        </button>
                       )}
                     </div>
                   </td>
