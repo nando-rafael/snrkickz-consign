@@ -8,8 +8,11 @@ export async function sendDiscordNotification(
     payout: number;
   },
   orderName: string
-): Promise<boolean> {
-  if (!webhookUrl) return false;
+): Promise<{ ok: boolean; error?: string }> {
+  if (!webhookUrl) {
+    console.warn("[Discord] No webhook URL provided");
+    return { ok: false, error: "Geen Discord webhook ingesteld" };
+  }
 
   try {
     const embed = {
@@ -50,16 +53,30 @@ export async function sendDiscordNotification(
       timestamp: new Date().toISOString(),
     };
 
+    console.log("[Discord] Sending notification to webhook");
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embeds: [embed] }),
     });
 
-    return response.ok;
-  } catch (error) {
-    console.error("Discord notification failed:", error);
-    return false;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Discord] Webhook failed: ${response.status} - ${errorText}`);
+      return {
+        ok: false,
+        error: `Discord error: ${response.status}`,
+      };
+    }
+
+    console.log("[Discord] Notification sent successfully");
+    return { ok: true };
+  } catch (error: any) {
+    console.error("[Discord] Notification failed:", error);
+    return {
+      ok: false,
+      error: error.message || "Discord verzenden mislukt",
+    };
   }
 }
 

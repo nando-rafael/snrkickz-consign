@@ -40,13 +40,30 @@ export async function POST(
   }
 
   try {
-    await sendDiscordNotification(
+    const discordResult = await sendDiscordNotification(
       consigner.discord_webhook_url,
       listing,
       listing.order_name || "Unknown"
     );
+
+    if (!discordResult.ok) {
+      console.error(
+        `[Resend-Discord] Notification failed for listing ${listing.id}:`,
+        discordResult.error
+      );
+      return NextResponse.json(
+        { error: discordResult.error || "Discord verzenden mislukt" },
+        { status: 500 }
+      );
+    }
+
+    console.log(`[Resend-Discord] Notification sent for listing ${listing.id}`);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
+    console.error(
+      `[Resend-Discord] Notification error for listing ${listing.id}:`,
+      e
+    );
     return NextResponse.json(
       { error: `Discord fout: ${e.message}` },
       { status: 500 }

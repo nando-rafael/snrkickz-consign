@@ -63,16 +63,34 @@ export async function POST(
   }
 
   const consigner = consignersTable.findById(listing.consigner_id);
+
+  // Send Discord notification if webhook is configured
   if (consigner?.discord_webhook_url) {
     try {
-      await sendDiscordNotification(
+      const discordResult = await sendDiscordNotification(
         consigner.discord_webhook_url,
         listing,
         trimmedOrderName
       );
-    } catch (e) {
-      console.error("Discord notificatie mislukt:", e);
+
+      if (!discordResult.ok) {
+        console.error(
+          `[Mark-Sold] Discord notification failed for listing ${listing.id}:`,
+          discordResult.error
+        );
+      } else {
+        console.log(`[Mark-Sold] Discord notification sent for listing ${listing.id}`);
+      }
+    } catch (e: any) {
+      console.error(
+        `[Mark-Sold] Discord notification error for listing ${listing.id}:`,
+        e
+      );
     }
+  } else {
+    console.warn(
+      `[Mark-Sold] No Discord webhook for consigner ${listing.consigner_id}`
+    );
   }
 
   return NextResponse.json({ ok: true });
