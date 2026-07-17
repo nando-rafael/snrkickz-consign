@@ -62,16 +62,35 @@ export async function POST(
     }
   }
 
+  // Fetch updated listing with new status
+  const updatedListing = listingsTable.findById(listing.id);
+
+  // Send Discord notification with updated listing
   const consigner = consignersTable.findById(listing.consigner_id);
-  if (consigner?.discord_webhook_url) {
+  if (consigner?.discord_webhook_url && updatedListing) {
     try {
+      console.log(
+        `[Mark Sold] Sending Discord notification for listing ${listing.id} to ${consigner.name}`
+      );
       await sendDiscordNotification(
         consigner.discord_webhook_url,
-        listing,
+        updatedListing,
         trimmedOrderName
       );
-    } catch (e) {
-      console.error("Discord notificatie mislukt:", e);
+    } catch (e: any) {
+      console.error(
+        `[Mark Sold] Discord notificatie mislukt voor listing ${listing.id}:`,
+        e.message
+      );
+    }
+  } else {
+    if (!consigner?.discord_webhook_url) {
+      console.log(
+        `[Mark Sold] No Discord webhook configured for consigner ${consigner?.name || listing.consigner_id}`
+      );
+    }
+    if (!updatedListing) {
+      console.error(`[Mark Sold] Updated listing not found for ID ${listing.id}`);
     }
   }
 
