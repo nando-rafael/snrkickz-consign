@@ -46,8 +46,7 @@ export default function ListingsSection({ initialListings }: Props) {
   const [markSoldLoading, setMarkSoldLoading] = useState(false);
   const [markSoldError, setMarkSoldError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [discordLoading, setDiscordLoading] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -104,30 +103,23 @@ export default function ListingsSection({ initialListings }: Props) {
     }
   }
 
-  async function handleResendDiscord(id: number, orderName: string) {
-    if (!window.confirm(`Discord notificatie opnieuw verzenden voor ${orderName}?`)) {
-      return;
-    }
-
-    setActionError(null);
-    setSuccessMsg(null);
-    setLoadingId(id);
+  async function handleResendDiscord(id: number) {
+    setDiscordLoading(id);
     try {
       const res = await fetch(`/api/admin/listings/${id}/resend-discord`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
       });
       const data = await res.json();
       if (!res.ok) {
-        setActionError(data.error || "Resend mislukt");
+        setSuccessMsg(`❌ Discord fout: ${data.error}`);
       } else {
-        setSuccessMsg(`Discord notificatie verzonden ✓`);
-        setTimeout(() => setSuccessMsg(null), 3000);
+        setSuccessMsg(`✓ Discord notification hergestuurd naar consignor`);
       }
+      setTimeout(() => setSuccessMsg(null), 4000);
     } catch {
-      setActionError("Netwerkfout. Probeer opnieuw.");
+      setSuccessMsg(`❌ Netwerkfout. Probeer opnieuw.`);
     } finally {
-      setLoadingId(null);
+      setDiscordLoading(null);
     }
   }
 
@@ -492,15 +484,12 @@ export default function ListingsSection({ initialListings }: Props) {
                         <button
                           className="btn sm"
                           type="button"
-                          disabled={loadingId === l.id}
-                          onClick={() => handleResendDiscord(l.id, l.order_name || "Onbekend")}
-                          title="Discord notificatie opnieuw verzenden"
-                          style={{
-                            background: "rgba(88, 101, 242, 0.15)",
-                            color: "#5865F2",
-                          }}
+                          disabled={discordLoading === l.id}
+                          onClick={() => handleResendDiscord(l.id)}
+                          style={{ background: "rgba(88,101,242,0.2)", color: "#5865f2" }}
+                          title="Discord notification opnieuw versturen"
                         >
-                          💬 Discord
+                          {discordLoading === l.id ? "Bezig..." : "📢 Discord"}
                         </button>
                       )}
                     </div>

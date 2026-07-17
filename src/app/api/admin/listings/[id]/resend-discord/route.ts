@@ -15,34 +15,26 @@ export async function POST(
     return NextResponse.json({ error: "Geen toegang" }, { status: 403 });
   }
 
-  const listingId = parseInt(params.id, 10);
-  if (isNaN(listingId)) {
-    return NextResponse.json({ error: "Ongeldig ID" }, { status: 400 });
-  }
-
-  const listing = listingsTable.findById(listingId);
+  const listing = listingsTable.findById(Number(params.id));
   if (!listing) {
     return NextResponse.json({ error: "Listing niet gevonden" }, { status: 404 });
   }
 
   if (listing.status !== "SOLD") {
     return NextResponse.json(
-      { error: "Listing is niet verkocht" },
+      { error: "Alleen SOLD listings kunnen opnieuw worden gestuurd" },
       { status: 400 }
     );
   }
 
   const consigner = consignersTable.findById(listing.consigner_id);
   if (!consigner) {
-    return NextResponse.json(
-      { error: "Consigner niet gevonden" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "Consignor niet gevonden" }, { status: 404 });
   }
 
   if (!consigner.discord_webhook_url) {
     return NextResponse.json(
-      { error: "Consigner heeft geen Discord webhook ingesteld" },
+      { error: "Consignor heeft geen Discord webhook ingesteld" },
       { status: 400 }
     );
   }
@@ -51,16 +43,12 @@ export async function POST(
     await sendDiscordNotification(
       consigner.discord_webhook_url,
       listing,
-      listing.order_name || "Onbekend"
+      listing.order_name || "Unknown"
     );
-
-    return NextResponse.json({
-      ok: true,
-      message: "Discord notificatie opnieuw verzonden",
-    });
+    return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json(
-      { error: e.message || "Discord notificatie verzenden mislukt" },
+      { error: `Discord fout: ${e.message}` },
       { status: 500 }
     );
   }
