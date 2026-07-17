@@ -46,6 +46,7 @@ export default function ListingsSection({ initialListings }: Props) {
   const [markSoldLoading, setMarkSoldLoading] = useState(false);
   const [markSoldError, setMarkSoldError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [discordLoading, setDiscordLoading] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "lowest" | "undercut">("all");
   const [searchQuery, setSearchQuery] = useState("");
