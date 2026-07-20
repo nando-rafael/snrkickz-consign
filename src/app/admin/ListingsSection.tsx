@@ -24,6 +24,8 @@ function euro(n: number): string {
 }
 
 function getLowestAskInfo(listing: ListingWithConsigner, allListings: ListingWithConsigner[]) {
+  if (!listing.variant_id) return null;
+
   const activeOnVariant = allListings.filter(
     (l) => l.variant_id === listing.variant_id && l.status === "ACTIVE"
   );
@@ -409,7 +411,7 @@ export default function ListingsSection({ initialListings }: Props) {
                     </span>
                   </td>
                   <td>
-                    {l.status === "ACTIVE" && (() => {
+                    {l.status === "ACTIVE" && l.variant_id ? (() => {
                       const info = getLowestAskInfo(l, listings);
                       if (!info) return <span style={{ color: "var(--muted)" }}>—</span>;
                       return (
@@ -437,7 +439,7 @@ export default function ListingsSection({ initialListings }: Props) {
                           )}
                         </div>
                       );
-                    })()}
+                    })() : <span style={{ color: "var(--muted)" }}>—</span>}
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
