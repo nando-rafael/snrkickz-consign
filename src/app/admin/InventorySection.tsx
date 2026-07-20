@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { Inventory } from "@/lib/db";
 
@@ -36,6 +36,20 @@ export default function InventorySection({ initialItems }: Props) {
   const [toListing, setToListing] = useState<ToListingState | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
+
+  // ── Search ───────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+
+    const query = searchQuery.toLowerCase();
+    return items.filter(
+      (item) =>
+        item.product_title.toLowerCase().includes(query) ||
+        item.sku.toLowerCase().includes(query)
+    );
+  }, [items, searchQuery]);
 
   // ── Handlers ─────────────────────────────────────────────────
   async function handleAdd() {
@@ -149,16 +163,21 @@ export default function InventorySection({ initialItems }: Props) {
 
   // ── Pagination derived values ────────────────────────────────
   const itemsPerPage = 50;
-  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const start = (page - 1) * itemsPerPage;
-  const paginatedItems = items.slice(start, start + itemsPerPage);
+  const paginatedItems = filtered.slice(start, start + itemsPerPage);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
 
   // ── Render ───────────────────────────────────────────────────
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "32px 0 12px" }}>
         <h2 className="section-title" style={{ margin: 0 }}>
-          Mijn Inventory ({items.length})
+          Mijn Inventory ({filtered.length})
         </h2>
         <button
           className="btn sm ghost"
@@ -226,9 +245,32 @@ export default function InventorySection({ initialItems }: Props) {
         </div>
       )}
 
+      <div style={{ marginBottom: 16 }}>
+        <input
+          type="text"
+          placeholder="Zoeken op productnaam of SKU..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: "100%",
+            maxWidth: 400,
+            padding: "8px 12px",
+            border: "1px solid var(--border)",
+            borderRadius: 6,
+            background: "var(--card)",
+            color: "var(--fg)",
+            fontSize: 13,
+          }}
+        />
+      </div>
+
       <div className="table-wrap">
-        {items.length === 0 ? (
-          <div className="empty">Geen inventory items.</div>
+        {filtered.length === 0 ? (
+          <div className="empty">
+            {searchQuery
+              ? "Geen sneakers gevonden."
+              : "Geen inventory items."}
+          </div>
         ) : (
           <table>
             <thead>
