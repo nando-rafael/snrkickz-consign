@@ -196,23 +196,24 @@ export default function ListingsSection({ initialListings }: Props) {
   }
 
   const filtered = listings.filter((l) => {
-    if (filter === "lowest") {
-      const lowestOnVariant = Math.min(
-        ...listings
-          .filter((x) => x.variant_id === l.variant_id && x.status === "ACTIVE")
-          .map((x) => x.payout)
+    // Apply lowest/undercut filters first
+    if (filter === "lowest" || filter === "undercut") {
+      const activeOnVariant = listings.filter(
+        (x) => x.variant_id === l.variant_id && x.status === "ACTIVE"
       );
-      if (l.payout !== lowestOnVariant) return false;
-    }
-    if (filter === "undercut") {
-      const lowestOnVariant = Math.min(
-        ...listings
-          .filter((x) => x.variant_id === l.variant_id && x.status === "ACTIVE")
-          .map((x) => x.payout)
-      );
-      if (l.payout <= lowestOnVariant) return false;
+
+      if (activeOnVariant.length === 0) return false;
+
+      const lowestPayout = Math.min(...activeOnVariant.map((x) => x.payout));
+
+      if (filter === "lowest") {
+        if (l.payout !== lowestPayout) return false;
+      } else if (filter === "undercut") {
+        if (l.payout <= lowestPayout) return false;
+      }
     }
 
+    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       const matchesSku = l.sku.toLowerCase().includes(query);
