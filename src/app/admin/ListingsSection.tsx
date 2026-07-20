@@ -409,7 +409,7 @@ export default function ListingsSection({ initialListings }: Props) {
                     </span>
                   </td>
                   <td>
-                    {l.status === "ACTIVE" && (() => {
+                    {l.status === "ACTIVE" && l.variant_id && (() => {
                       const info = getLowestAskInfo(l, listings);
                       if (!info) return <span style={{ color: "var(--muted)" }}>—</span>;
                       return (
