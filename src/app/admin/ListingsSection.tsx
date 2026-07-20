@@ -218,9 +218,9 @@ export default function ListingsSection({ initialListings }: Props) {
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      const matchesSku = l.sku.toLowerCase().includes(query);
+      const matchesSku = l.sku?.toLowerCase().includes(query) || false;
       const matchesProduct = (l.product_title || "").toLowerCase().includes(query);
-      const matchesConsigner = l.consigner_name.toLowerCase().includes(query);
+      const matchesConsigner = (l.consigner_name || "").toLowerCase().includes(query);
       const matchesId = l.id.toString().includes(query);
 
       if (!matchesSku && !matchesProduct && !matchesConsigner && !matchesId) {
