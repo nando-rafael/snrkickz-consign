@@ -218,9 +218,9 @@ export default function ListingsSection({ initialListings }: Props) {
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      const matchesSku = l.sku.toLowerCase().includes(query);
+      const matchesSku = (l.sku || "").toLowerCase().includes(query);
       const matchesProduct = (l.product_title || "").toLowerCase().includes(query);
-      const matchesConsigner = l.consigner_name.toLowerCase().includes(query);
+      const matchesConsigner = (l.consigner_name || "").toLowerCase().includes(query);
       const matchesId = l.id.toString().includes(query);
 
       if (!matchesSku && !matchesProduct && !matchesConsigner && !matchesId) {
@@ -364,12 +364,12 @@ export default function ListingsSection({ initialListings }: Props) {
                   <td>
                     <div className="prod">
                       {l.product_image && <img src={l.product_image} alt="" />}
-                      <span className="t">{l.product_title}</span>
+                      <span className="t">{l.product_title || "—"}</span>
                     </div>
                   </td>
-                  <td><span className="sku">{l.sku}</span></td>
-                  <td><span className="size-chip">{l.size}</span></td>
-                  <td>{l.consigner_name}</td>
+                  <td><span className="sku">{l.sku || "—"}</span></td>
+                  <td><span className="size-chip">{l.size || "—"}</span></td>
+                  <td>{l.consigner_name || "—"}</td>
                   <td className="num">{euro(l.payout)}</td>
                   <td className="num">{euro(l.sale_price)}</td>
                   <td className="num">
@@ -482,7 +482,7 @@ export default function ListingsSection({ initialListings }: Props) {
                         </>
                       )}
                       {l.status === "SOLD" && l.order_name && (
-                        <span className="size-chip">{l.order_name}</span>
+                        <span className="size-chip">{l.order_name || "—"}</span>
                       )}
                       {l.status === "SOLD" && (
                         <button
