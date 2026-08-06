@@ -234,7 +234,7 @@ export default function SalesSection({ initialListings }: Props) {
                 <th>Product</th>
                 <th>Consigner</th>
                 <th>Verkoopprijs</th>
-                <th>Payout</th>
+                <th>Estimated Payout</th>
                 <th>Marge</th>
                 <th>Label</th>
                 <th>Melding</th>
