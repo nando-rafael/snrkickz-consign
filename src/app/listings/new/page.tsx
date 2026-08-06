@@ -165,7 +165,7 @@ export default function NewListing() {
           styleCode: product.sku,
           listings: activeEntries.map(({ variant, payout, quantity }) => ({
             variantId: variant.id,
-            payout,
+            payout: Math.round(payout - (payout * (product.feePct / 100)) - 10),
             quantity,
           })),
         }),
@@ -678,11 +678,10 @@ export default function NewListing() {
             <button
               className="btn ghost full"
               onClick={backToResults}
-              disabled={submitting}
               type="button"
-              style={{ marginTop: 8 }}
+              style={{ marginTop: 10 }}
             >
-              ← Choose a different colour
+              Change product
             </button>
           </>
         )}
@@ -690,3 +689,4 @@ export default function NewListing() {
     </main>
   );
 }
+
