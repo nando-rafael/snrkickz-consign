@@ -570,10 +570,10 @@ export default function NewListing() {
                 <thead>
                   <tr>
                     <th>Size (EU)</th>
-                    <th className="num">Store Price</th>
+                    <th className="num">Shopify Price</th>
                     <th className="num">Max Payout</th>
                     <th className="num">Selling Price (€)</th>
-                    <th className="num">Your Payout (€)</th>
+                    <th className="num">Estimated Payout (€)</th>
                     <th className="num">Qty</th>
                   </tr>
                 </thead>
