@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { computeConsignorPayout } from "@/lib/config";
 
 type VariantOption = {
   id: string;
@@ -58,30 +59,30 @@ export default function NewListing() {
   const [reqSuccess, setReqSuccess] = useState(false);
   const [reqSubmitting, setReqSubmitting] = useState(false);
 
-  /** Variants that have a valid payout entered */
+  /** Variants that have a valid selling price entered */
   const activeEntries =
     product?.variants.flatMap((v) => {
       const raw = payouts[v.id] ?? "";
       const num = parseFloat(raw);
       if (!raw || isNaN(num) || num <= 0) return [];
       const qty = Math.max(1, Math.min(10, quantities[v.id] ?? 1));
-      return [{ variant: v, payout: num, quantity: qty }];
+      return [{ variant: v, salePrice: num, quantity: qty }];
     }) ?? [];
 
   /** Total number of individual listings that will be created */
   const listingCount = activeEntries.reduce((sum, e) => sum + e.quantity, 0);
 
-  /** True if any entered payout exceeds the variant's maxPayout */
+  /** True if any entered selling price exceeds the variant's max selling price (store price) */
   const hasOverpay =
     product?.variants.some((v) => {
       const raw = payouts[v.id] ?? "";
       const num = parseFloat(raw);
-      return raw && !isNaN(num) && num > v.maxPayout;
+      return raw && !isNaN(num) && num > v.currentPrice;
     }) ?? false;
 
-  function calcSalePrice(payout: number): number {
+  function calcPayoutFromSalePrice(salePrice: number): number {
     if (!product) return 0;
-    return Math.ceil(payout / (1 - product.feePct / 100));
+    return computeConsignorPayout(salePrice);
   }
 
   async function lookup() {
@@ -163,9 +164,9 @@ export default function NewListing() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           styleCode: product.sku,
-          listings: activeEntries.map(({ variant, payout, quantity }) => ({
+          listings: activeEntries.map(({ variant, salePrice, quantity }) => ({
             variantId: variant.id,
-            payout: Math.round(payout - (payout * (product.feePct / 100)) - 10),
+            salePrice,
             quantity,
           })),
         }),
@@ -571,8 +572,8 @@ export default function NewListing() {
                     <th>Size (EU)</th>
                     <th className="num">Store Price</th>
                     <th className="num">Max Payout</th>
+                    <th className="num">Selling Price (€)</th>
                     <th className="num">Your Payout (€)</th>
-                    <th className="num">Sale Price</th>
                     <th className="num">Qty</th>
                   </tr>
                 </thead>
@@ -581,8 +582,8 @@ export default function NewListing() {
                     const raw = payouts[v.id] ?? "";
                     const num = parseFloat(raw);
                     const hasValue = raw !== "" && !isNaN(num) && num > 0;
-                    const overpay = hasValue && num > v.maxPayout;
-                    const salePrice = hasValue && !overpay ? calcSalePrice(num) : null;
+                    const overpay = hasValue && num > v.currentPrice;
+                    const payout = hasValue && !overpay ? calcPayoutFromSalePrice(num) : null;
 
                     return (
                       <tr key={v.id}>
@@ -624,13 +625,13 @@ export default function NewListing() {
                                 textAlign: "right",
                               }}
                             >
-                              max €{v.maxPayout}
+                              max €{v.currentPrice}
                             </div>
                           )}
                         </td>
                         <td className="num">
-                          {salePrice ? (
-                            <span style={{ fontWeight: 700 }}>€{salePrice}</span>
+                          {payout !== null ? (
+                            <span style={{ fontWeight: 700 }}>€{payout}</span>
                           ) : (
                             <span style={{ color: "var(--muted)" }}>—</span>
                           )}
@@ -659,7 +660,7 @@ export default function NewListing() {
             </div>
 
             <p className="hint" style={{ marginBottom: 16 }}>
-              Leave a field empty to skip that size. The sale price is calculated live.
+              Leave a field empty to skip that size. Your payout is calculated live.
             </p>
 
             <button

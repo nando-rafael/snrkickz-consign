@@ -12,6 +12,15 @@ export function computeSalePrice(payout: number): number {
   return Math.ceil(payout / (1 - feePct() / 100));
 }
 
+/**
+ * Consignor payout wordt berekend vanaf de verkoopprijs (bron van waarheid).
+ * payout = verkoopprijs - 15% fee - €10 platform marge, afgerond naar hele euro's.
+ * Voorbeeld: verkoopprijs 174 => Math.round(174 - 26.10 - 10) = 138
+ */
+export function computeConsignorPayout(salePrice: number): number {
+  return Math.round(salePrice - salePrice * 0.15 - 10);
+}
+
 export function normalizeSku(styleCode: string, size: string): string {
   const clean = (s: string) => s.trim().toUpperCase().replace(/\s+/g, "");
   return `${clean(styleCode)}-${clean(size)}`;
