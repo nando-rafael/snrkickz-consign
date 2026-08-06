@@ -165,7 +165,7 @@ export default function NewListing() {
           styleCode: product.sku,
           listings: activeEntries.map(({ variant, payout, quantity }) => ({
             variantId: variant.id,
-            payout,
+            payout: Math.round(payout - (payout * (product.feePct / 100)) - 10),
             quantity,
           })),
         }),
