@@ -12,8 +12,22 @@ export function computeSalePrice(payout: number): number {
   return Math.ceil(payout / (1 - feePct() / 100));
 }
 
+/**
+ * Calculate consignor payout from selling price.
+ * Deducts 15% platform fee and an additional €10 platform margin.
+ * Rounds to nearest whole euro using Math.round.
+ * 
+ * Voorbeeld: selling_price €174
+ * => 174 - (174 * 0.15) - 10 = 137.90 => rounds to €138
+ */
+export function computeConsignorPayout(salePrice: number): number {
+  const feeAmount = salePrice * (feePct() / 100);
+  const platformMargin = 10;
+  return Math.round(salePrice - feeAmount - platformMargin);
+}
+
 export function normalizeSku(styleCode: string, size: string): string {
-  const clean = (s: string) => s.trim().toUpperCase().replace(/\s+/g, "");
+  const clean = (s: string) => s.trim().toUpperCase().replace(/\\s+/g, "");
   return `${clean(styleCode)}-${clean(size)}`;
 }
 
@@ -23,3 +37,4 @@ export function euro(n: number): string {
     maximumFractionDigits: 2,
   })}`;
 }
+
