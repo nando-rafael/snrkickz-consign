@@ -339,7 +339,7 @@ export default function ListingsSection({ initialListings }: Props) {
                 <th>SKU</th>
                 <th>Maat</th>
                 <th>Consigner</th>
-                <th>Payout</th>
+                <th>Estimated Payout</th>
                 <th>Verkoop</th>
                 <th>Verkoopprijs</th>
                 <th>Marge</th>

@@ -372,7 +372,7 @@ export default function InventorySection({ initialItems }: Props) {
               {uploadError && <div className="error">{uploadError}</div>}
 
               <div className="field">
-                <label htmlFor="ul-payout">Payout (€)</label>
+                <label htmlFor="ul-payout">Estimated Payout (€)</label>
                 <input
                   id="ul-payout"
                   type="number"

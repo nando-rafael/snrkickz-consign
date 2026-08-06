@@ -243,8 +243,8 @@ export default function ListingsTable({ initialGroups, totalListings }: Props) {
             <th>Product</th>
             <th>SKU</th>
             <th>Size</th>
-            <th>Payout</th>
-            <th>Sale Price</th>
+            <th>Estimated Payout</th>
+            <th>Selling Price</th>
             <th>Qty</th>
             <th>Status</th>
             <th></th>
