@@ -41,7 +41,7 @@ export default function NewListing() {
   const [feePct, setFeePct] = useState(0);
   // Step 2: chosen product + per-size payouts
   const [product, setProduct] = useState<SelectedProduct | null>(null);
-  const [payouts, setPayouts] = useState<Record<string, string>>({});
+  const [sellingPrices, setSellingPrices] = useState<Record<string, string>>({});
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,37 +58,32 @@ export default function NewListing() {
   const [reqSuccess, setReqSuccess] = useState(false);
   const [reqSubmitting, setReqSubmitting] = useState(false);
 
-  /** Variants that have a valid payout entered */
+  /** Variants that have a valid selling price entered */
   const activeEntries =
     product?.variants.flatMap((v) => {
-      const raw = payouts[v.id] ?? "";
+      const raw = sellingPrices[v.id] ?? "";
       const num = parseFloat(raw);
       if (!raw || isNaN(num) || num <= 0) return [];
       const qty = Math.max(1, Math.min(10, quantities[v.id] ?? 1));
-      return [{ variant: v, payout: num, quantity: qty }];
+      const payout = calcPayoutFromSellingPrice(num);
+      return [{ variant: v, salePrice: num, payout, quantity: qty }];
     }) ?? [];
 
   /** Total number of individual listings that will be created */
   const listingCount = activeEntries.reduce((sum, e) => sum + e.quantity, 0);
 
-  /** True if any entered payout exceeds the variant's maxPayout */
-  const hasOverpay =
-    product?.variants.some((v) => {
-      const raw = payouts[v.id] ?? "";
-      const num = parseFloat(raw);
-      return raw && !isNaN(num) && num > v.maxPayout;
-    }) ?? false;
-
-  function calcSalePrice(payout: number): number {
+  function calcPayoutFromSellingPrice(sellingPrice: number): number {
     if (!product) return 0;
-    return Math.ceil(payout / (1 - product.feePct / 100));
+    const feeAmount = sellingPrice * (product.feePct / 100);
+    const platformMargin = 10;
+    return Math.round(sellingPrice - feeAmount - platformMargin);
   }
 
   async function lookup() {
     setError(null);
     setResults(null);
     setProduct(null);
-    setPayouts({});
+    setSellingPrices({});
     setQuantities({});
     setSuccessCount(null);
     setFailedItems([]);
@@ -125,7 +120,7 @@ export default function NewListing() {
       feePct,
       variants: p.variants,
     });
-    setPayouts({});
+    setSellingPrices({});
     setQuantities({});
     setError(null);
     setSuccessCount(null);
@@ -134,15 +129,15 @@ export default function NewListing() {
 
   function backToResults() {
     setProduct(null);
-    setPayouts({});
+    setSellingPrices({});
     setQuantities({});
     setError(null);
     setSuccessCount(null);
     setFailedItems([]);
   }
 
-  function setPayoutForVariant(variantId: string, value: string) {
-    setPayouts((prev) => ({ ...prev, [variantId]: value }));
+  function setSellingPriceForVariant(variantId: string, value: string) {
+    setSellingPrices((prev) => ({ ...prev, [variantId]: value }));
   }
 
   function setQuantityForVariant(variantId: string, value: number) {
@@ -152,10 +147,6 @@ export default function NewListing() {
   async function submit() {
     setError(null);
     if (!product || listingCount === 0) return;
-    if (hasOverpay) {
-      setError("One or more payouts are too high. Please correct the fields highlighted in red.");
-      return;
-    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/listings", {
@@ -163,9 +154,9 @@ export default function NewListing() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           styleCode: product.sku,
-          listings: activeEntries.map(({ variant, payout, quantity }) => ({
+          listings: activeEntries.map(({ variant, salePrice, payout, quantity }) => ({
             variantId: variant.id,
-            payout,
+            salePrice,
             quantity,
           })),
         }),
@@ -181,7 +172,7 @@ export default function NewListing() {
         if (totalCreated > 0) {
           setSuccessCount(totalCreated);
           setFailedItems(failed);
-          setPayouts({});
+          setSellingPrices({});
           setQuantities({});
           // Redirect after a short delay so the user sees the success message
           setTimeout(() => {
@@ -571,18 +562,17 @@ export default function NewListing() {
                     <th>Size (EU)</th>
                     <th className="num">Store Price</th>
                     <th className="num">Max Payout</th>
-                    <th className="num">Your Payout (€)</th>
-                    <th className="num">Sale Price</th>
+                    <th className="num">Selling Price (€)</th>
+                    <th className="num">Est. Your Payout</th>
                     <th className="num">Qty</th>
                   </tr>
                 </thead>
                 <tbody>
                   {product.variants.map((v) => {
-                    const raw = payouts[v.id] ?? "";
+                    const raw = sellingPrices[v.id] ?? "";
                     const num = parseFloat(raw);
                     const hasValue = raw !== "" && !isNaN(num) && num > 0;
-                    const overpay = hasValue && num > v.maxPayout;
-                    const salePrice = hasValue && !overpay ? calcSalePrice(num) : null;
+                    const payout = hasValue ? calcPayoutFromSellingPrice(num) : null;
 
                     return (
                       <tr key={v.id}>
@@ -602,38 +592,16 @@ export default function NewListing() {
                             step="1"
                             placeholder="—"
                             value={raw}
-                            onChange={(e) => setPayoutForVariant(v.id, e.target.value)}
+                            onChange={(e) => setSellingPriceForVariant(v.id, e.target.value)}
                             style={{
                               textAlign: "right",
                               padding: "7px 10px",
                               fontSize: 13,
-                              borderColor: overpay
-                                ? "rgba(224, 112, 112, 0.7)"
-                                : undefined,
-                              background: overpay
-                                ? "rgba(224, 112, 112, 0.06)"
-                                : undefined,
                             }}
                           />
-                          {overpay && (
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: "#e8a0a0",
-                                marginTop: 3,
-                                textAlign: "right",
-                              }}
-                            >
-                              max €{v.maxPayout}
-                            </div>
-                          )}
                         </td>
                         <td className="num">
-                          {salePrice ? (
-                            <span style={{ fontWeight: 700 }}>€{salePrice}</span>
-                          ) : (
-                            <span style={{ color: "var(--muted)" }}>—</span>
-                          )}
+                          {payout !== null ? `€${payout}` : "—"}
                         </td>
                         <td className="num" style={{ width: 80 }}>
                           <input
@@ -659,19 +627,19 @@ export default function NewListing() {
             </div>
 
             <p className="hint" style={{ marginBottom: 16 }}>
-              Leave a field empty to skip that size. The sale price is calculated live.
+              Leave a field empty to skip that size. Your payout is calculated live.
             </p>
 
             <button
               className="btn full"
               onClick={submit}
-              disabled={submitting || listingCount === 0 || hasOverpay}
+              disabled={submitting || listingCount === 0}
               type="button"
             >
               {submitting
                 ? "Submitting…"
                 : listingCount === 0
-                ? "Enter at least one payout"
+                ? "Enter at least one selling price"
                 : `Submit ${listingCount} listing${listingCount !== 1 ? "s" : ""}`}
             </button>
 
