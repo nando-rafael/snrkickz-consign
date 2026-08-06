@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { listingsTable } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { adjustInventory, addProductToCollection, getVariantById } from "@/lib/shopify";
-import { computeSalePrice } from "@/lib/config";
+import { computeConsignorPayout } from "@/lib/config";
 import { recalcVariantPrice } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
@@ -13,14 +13,14 @@ async function processSingleListing(
   consignerId: number,
   variantId: string,
   styleCode: string,
-  payout: number,
+  salePrice: number,
   quantity = 1
 ): Promise<{ ok: true; ids: number[]; sku: string; size: string; salePrice: number }> {
   if (!variantId.startsWith("gid://shopify/ProductVariant/")) {
     throw Object.assign(new Error("Ongeldige variant"), { status: 400 });
   }
-  if (!payout || payout <= 0) {
-    throw Object.assign(new Error("Vul een geldige payout in"), { status: 400 });
+  if (!salePrice || salePrice <= 0) {
+    throw Object.assign(new Error("Vul een geldige verkoopprijs in"), { status: 400 });
   }
   const qty = Math.max(1, Math.min(10, Math.round(quantity)));
 
@@ -29,17 +29,15 @@ async function processSingleListing(
     throw Object.assign(new Error("Variant niet gevonden in de store"), { status: 404 });
   }
 
-  const salePrice = computeSalePrice(payout);
+  const payout = computeConsignorPayout(salePrice);
   const currentPrice = parseFloat(variant.price);
   const existing = listingsTable.findEarliestOriginalPrice(variantId);
   const originalPrice = existing?.original_price ?? currentPrice;
 
   if (salePrice > originalPrice) {
-    const fee = (salePrice - payout) / salePrice;
-    const maxPayout = Math.floor(originalPrice * (1 - fee));
     throw Object.assign(
       new Error(
-        `Payout te hoog. De storeprijs voor maat ${variant.size} is €${originalPrice}. Maximale payout: €${maxPayout}.`
+        `Verkoopprijs te hoog. De storeprijs voor maat ${variant.size} is €${originalPrice}. Maximale verkoopprijs: €${originalPrice}.`
       ),
       { status: 422 }
     );
@@ -94,9 +92,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const styleCode = String(body.styleCode || "").trim().toUpperCase();
 
-  // ── Batch mode: { styleCode, listings: [{ variantId, payout, quantity? }, ...] } ──
+  // ── Batch mode: { styleCode, listings: [{ variantId, salePrice, quantity? }, ...] } ──
   if (Array.isArray(body.listings)) {
-    const items: { variantId: string; payout: number; quantity?: number }[] = body.listings;
+    const items: { variantId: string; salePrice?: number; payout?: number; quantity?: number }[] = body.listings;
 
     if (items.length === 0) {
       return NextResponse.json({ error: "Geen listings opgegeven" }, { status: 400 });
@@ -107,10 +105,10 @@ export async function POST(req: NextRequest) {
 
     for (const item of items) {
       const variantId = String(item.variantId || "").trim();
-      const payout = parseFloat(String(item.payout));
+      const salePrice = parseFloat(String(item.salePrice ?? item.payout));
       const quantity = item.quantity ?? 1;
       try {
-        const result = await processSingleListing(session.id, variantId, styleCode, payout, quantity);
+        const result = await processSingleListing(session.id, variantId, styleCode, salePrice, quantity);
         created.push({ ids: result.ids, sku: result.sku, size: result.size, salePrice: result.salePrice });
       } catch (e: any) {
         failed.push({ variantId, error: e.message });
@@ -120,13 +118,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, created, failed });
   }
 
-  // ── Single mode (backward compatible): { variantId, styleCode, payout, quantity? } ──
+  // ── Single mode (backward compatible): { variantId, styleCode, salePrice, quantity? } ──
   const variantId = String(body.variantId || "").trim();
-  const payout = parseFloat(body.payout);
+  const salePrice = parseFloat(body.salePrice ?? body.payout);
   const quantity = body.quantity ?? 1;
 
   try {
-    const result = await processSingleListing(session.id, variantId, styleCode, payout, quantity);
+    const result = await processSingleListing(session.id, variantId, styleCode, salePrice, quantity);
     return NextResponse.json(result);
   } catch (e: any) {
     const status = e.status ?? 502;
