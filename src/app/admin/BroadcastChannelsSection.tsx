@@ -14,14 +14,23 @@ type BroadcastChannel = {
   created_at: string;
 };
 
+type FormState = {
+  brand: string;
+  match_type: "VENDOR" | "TAG" | "TITLE_CONTAINS";
+  match_value: string;
+  discord_webhook_url: string;
+  supplier_email: string;
+  default_payout_percentage: number;
+};
+
 export default function BroadcastChannelsSection() {
   const [channels, setChannels] = useState<BroadcastChannel[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>({
     brand: "",
-    match_type: "VENDOR" as const,
+    match_type: "VENDOR",
     match_value: "",
     discord_webhook_url: "",
     supplier_email: "",
@@ -47,7 +56,6 @@ export default function BroadcastChannelsSection() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (editId) {
-      // Update
       const res = await fetch(`/api/admin/broadcast-channels/${editId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -67,7 +75,6 @@ export default function BroadcastChannelsSection() {
         await fetchChannels();
       }
     } else {
-      // Create
       const res = await fetch("/api/admin/broadcast-channels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -92,7 +99,7 @@ export default function BroadcastChannelsSection() {
     setEditId(ch.id);
     setForm({
       brand: ch.brand,
-      match_type: ch.match_type,
+      match_type: ch.match_type as "VENDOR" | "TAG" | "TITLE_CONTAINS",
       match_value: ch.match_value,
       discord_webhook_url: ch.discord_webhook_url,
       supplier_email: ch.supplier_email,
@@ -148,7 +155,7 @@ export default function BroadcastChannelsSection() {
                 <label>Match Type</label>
                 <select
                   value={form.match_type}
-                  onChange={(e) => setForm({ ...form, match_type: e.target.value as any })}
+                  onChange={(e) => setForm({ ...form, match_type: e.target.value as "VENDOR" | "TAG" | "TITLE_CONTAINS" })}
                 >
                   <option value="VENDOR">Vendor</option>
                   <option value="TAG">Tag</option>
