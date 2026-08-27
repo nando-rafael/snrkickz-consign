@@ -102,15 +102,25 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    // Find Asics broadcast channel
-    const asicsChannel = broadcastChannelsTable.listAll().find(
-      (ch) => ch.brand.toUpperCase() === "ASICS" && ch.active
-    );
+    console.log(`[BROADCAST] Asics detected: ${item.productTitle}`);
+    
+    // Find Asics broadcast channel - fix active flag type coercion
+    const allChannels = broadcastChannelsTable.listAll();
+    console.log(`[BROADCAST] All channels:`, JSON.stringify(allChannels));
+    
+    const asicsChannel = allChannels.find((ch) => {
+      const isBrandMatch = ch.brand.toUpperCase() === "ASICS";
+      const isActive = ch.active === true || ch.active === 1 || ch.active === "true";
+      console.log(`[BROADCAST] Channel "${ch.brand}": isBrandMatch=${isBrandMatch}, isActive=${isActive} (raw active=${ch.active}, type=${typeof ch.active})`);
+      return isBrandMatch && isActive;
+    });
     
     if (!asicsChannel) {
-      console.log(`Asics order detected maar geen active channel configured`);
+      console.log(`[BROADCAST] Asics order detected maar geen active channel configured`);
       continue;
     }
+
+    console.log(`[BROADCAST] Found active Asics channel:`, asicsChannel.id);
 
     // Create broadcast order for Asics
     const claimToken = generateClaimToken();
@@ -136,6 +146,8 @@ export async function POST(req: NextRequest) {
       notes: null,
     });
 
+    console.log(`[BROADCAST] Created broadcast order:`, broadcastOrder.id);
+
     // Post Discord to Asics supplier with claim link
     const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN || "vibrant-motivation-production-a8c5.up.railway.app";
     const claimUrl = `https://${publicDomain}/broadcast/claim/${broadcastOrder.id}?token=${claimToken}`;
@@ -143,6 +155,7 @@ export async function POST(req: NextRequest) {
 
     const discordMsg = `📦 **${orderName}** — Asics order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}\n**Size:** EU ${item.size}\n**Price:** €${item.salePrice.toFixed(2)}\n**Your payout:** €${broadcastOrder.payout_amount.toFixed(2)}\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
     
+    console.log(`[BROADCAST] Posting to Discord webhook for channel ${asicsChannel.id}`);
     await postDiscord(asicsChannel.discord_webhook_url, discordMsg);
   }
 
