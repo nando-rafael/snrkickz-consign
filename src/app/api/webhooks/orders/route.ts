@@ -79,6 +79,23 @@ export async function POST(req: NextRequest) {
 
     // Track unmatched items for broadcast
     if (!itemMatched) {
+      // Extract size from properties array - try multiple formats
+      let size = "?";
+      if (li.properties && Array.isArray(li.properties)) {
+        const sizeProperty = li.properties.find((p: any) => p.name?.toLowerCase() === "size");
+        if (sizeProperty?.value) {
+          size = sizeProperty.value;
+        }
+      }
+      // Fallback: check variant title
+      if (size === "?" && li.variant_title) {
+        // Try to extract size from variant title (e.g., "Kayano 14 - EU 42")
+        const sizeMatch = li.variant_title.match(/EU\s*(\d+(?:\.\d+)?)/i);
+        if (sizeMatch) {
+          size = sizeMatch[1];
+        }
+      }
+
       unmatchedItems.push({
         lineItemId: li.id,
         variantId: li.variant_id,
@@ -86,7 +103,7 @@ export async function POST(req: NextRequest) {
         productTitle: li.title,
         vendor: li.vendor,
         sku: li.sku,
-        size: li.properties?.find((p: any) => p.name === "Size")?.value || "?",
+        size: size,
         quantity: qty,
         imageUrl: li.image?.src || null,
         price: li.price,
@@ -154,9 +171,15 @@ export async function POST(req: NextRequest) {
     const claimUrl = `https://${publicDomain}/broadcast/claim/${broadcastOrder.id}?token=${claimToken}`;
     const rejectUrl = `https://${publicDomain}/broadcast/reject/${broadcastOrder.id}?token=${claimToken}`;
 
-    const discordMsg = `📦 **${orderName}** — Asics order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}\n**Size:** EU ${item.size}\n**Price:** €${item.salePrice.toFixed(2)}\n**Your payout:** €${broadcastOrder.payout_amount.toFixed(2)}\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
+    // Build Discord message without price info
+    let discordMsg = `📦 **${orderName}** — Asics order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}`;
+    if (item.size !== "?") {
+      discordMsg += `\n**Size:** EU ${item.size}`;
+    }
+    discordMsg += `\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
     
     console.log(`[BROADCAST] Posting to Discord webhook for channel ${asicsChannel.id}`);
+    console.log(`[BROADCAST] Size parsed as: "${item.size}"`);
     await postDiscord(asicsChannel.discord_webhook_url, discordMsg);
   }
 
