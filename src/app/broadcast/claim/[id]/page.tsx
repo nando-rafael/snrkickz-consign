@@ -40,12 +40,15 @@ export default function ClaimPage({ params }: { params: { id: string } }) {
     if (!token) return;
     setClaiming(true);
     try {
-      const res = await fetch(`/api/broadcast/claim/${params.id}`, {
+      // Pass token as query parameter, not in body
+      const res = await fetch(`/api/broadcast/claim/${params.id}?token=${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
       });
-      if (!res.ok) throw new Error("Fout bij claimen");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Fout bij claimen");
+      }
       setClaimed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fout bij claimen");
