@@ -8,6 +8,7 @@ import ListingsSection from "./ListingsSection";
 import SalesSection from "./SalesSection";
 import ConsignersSection from "./ConsignersSection";
 import BroadcastOrdersSection from "./BroadcastOrdersSection";
+import BroadcastChannelsSection from "./BroadcastChannelsSection";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,8 @@ export default async function AdminPage() {
       <ConsignersSection initialConsigners={consigners} />
 
       <InventorySection initialItems={inventory} />
+
+      <BroadcastChannelsSection />
 
       <BroadcastOrdersSection />
 
