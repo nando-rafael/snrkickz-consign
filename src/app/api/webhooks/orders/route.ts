@@ -31,6 +31,47 @@ async function postDiscord(webhookUrl: string, message: string) {
   }
 }
 
+// Helper function to extract size from line item
+function extractSize(li: any): string {
+  let size = "";
+  
+  // Method 1: Check properties array (custom fields added at checkout)
+  if (li.properties && Array.isArray(li.properties)) {
+    const sizeProperty = li.properties.find((p: any) => 
+      p.name?.toLowerCase() === "size" || p.name?.toLowerCase() === "taille" || p.name?.toLowerCase() === "maat"
+    );
+    if (sizeProperty?.value) {
+      return sizeProperty.value.toString().trim();
+    }
+  }
+  
+  // Method 2: Extract from variant_title (e.g., "Kayano 14 - EU 42" or "Kayano 14 White Ivory - Size 42")
+  if (li.variant_title) {
+    // Try EU size format
+    let match = li.variant_title.match(/EU\s*(\d+(?:\.\d+)?)/i);
+    if (match) return match[1];
+    
+    // Try "Size XX" format
+    match = li.variant_title.match(/[Ss]ize[\s-]*(\d+(?:\.\d+)?)/);
+    if (match) return match[1];
+    
+    // Try last numeric value in variant title (fallback)
+    match = li.variant_title.match(/(\d+(?:\.\d+)?)\s*$/);
+    if (match) return match[1];
+  }
+  
+  // Method 3: Check SKU for size suffix (some stores put size at end)
+  if (li.sku) {
+    const parts = li.sku.split("-");
+    const lastPart = parts[parts.length - 1];
+    if (/^\d+/.test(lastPart)) {
+      return lastPart.replace(/\D/g, "");
+    }
+  }
+  
+  return "";
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
@@ -56,6 +97,14 @@ export async function POST(req: NextRequest) {
     const qty: number = li?.quantity || 1;
     let itemMatched = false;
     
+    // Log all line items for Asics
+    if (li.vendor?.toUpperCase() === "ASICS") {
+      console.log(`[BROADCAST] Processing Asics item: "${li.title}"`);
+      console.log(`[BROADCAST]   variant_title: "${li.variant_title}"`);
+      console.log(`[BROADCAST]   SKU: "${li.sku}"`);
+      console.log(`[BROADCAST]   properties: ${JSON.stringify(li.properties)}`);
+    }
+    
     for (let i = 0; i < qty; i++) {
       const listing = listingsTable.findActiveByVariantLowestPayout(variantGid);
       if (!listing) break;
@@ -79,35 +128,10 @@ export async function POST(req: NextRequest) {
 
     // Track unmatched items for broadcast
     if (!itemMatched) {
-      // Extract size from properties array - try multiple formats
-      let size = "?";
+      const size = extractSize(li);
       
-      console.log(`[BROADCAST] Line item debug for "${li.title}":`, {
-        properties: li.properties,
-        variant_title: li.variant_title,
-        variant_id: li.variant_id,
-      });
-
-      if (li.properties && Array.isArray(li.properties)) {
-        console.log(`[BROADCAST] Properties array:`, JSON.stringify(li.properties));
-        const sizeProperty = li.properties.find((p: any) => p.name?.toLowerCase() === "size");
-        console.log(`[BROADCAST] Size property found:`, sizeProperty);
-        if (sizeProperty?.value) {
-          size = sizeProperty.value;
-          console.log(`[BROADCAST] Size extracted from properties: "${size}"`);
-        }
-      }
-      
-      // Fallback: check variant title
-      if (size === "?" && li.variant_title) {
-        // Try to extract size from variant title (e.g., "Kayano 14 - EU 42")
-        const sizeMatch = li.variant_title.match(/EU\s*(\d+(?:\.\d+)?)/i);
-        if (sizeMatch) {
-          size = sizeMatch[1];
-          console.log(`[BROADCAST] Size extracted from variant_title: "${size}"`);
-        } else {
-          console.log(`[BROADCAST] No size match in variant_title: "${li.variant_title}"`);
-        }
+      if (li.vendor?.toUpperCase() === "ASICS") {
+        console.log(`[BROADCAST]   extracted size: "${size}"`);
       }
 
       unmatchedItems.push({
@@ -133,28 +157,22 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
-    console.log(`[BROADCAST] Asics detected: ${item.productTitle}`);
+    console.log(`[BROADCAST] Processing Asics broadcast order: ${item.productTitle}`);
+    console.log(`[BROADCAST]   Size for Discord: "${item.size}"`);
     
-    // Find Asics broadcast channel - fix active flag type coercion
-    const allChannels = broadcastChannelsTable.listAll();
-    console.log(`[BROADCAST] All channels:`, JSON.stringify(allChannels));
-    
-    const asicsChannel = allChannels.find((ch) => {
-      const isBrandMatch = ch.brand.toUpperCase() === "ASICS";
-      // Handle active as boolean (it's stored as boolean in the type, but may serialize differently)
-      const isActive = Boolean(ch.active);
-      console.log(`[BROADCAST] Channel "${ch.brand}": isBrandMatch=${isBrandMatch}, isActive=${isActive} (raw active=${ch.active}, type=${typeof ch.active})`);
-      return isBrandMatch && isActive;
-    });
+    // Find Asics broadcast channel
+    const asicsChannel = broadcastChannelsTable.listAll().find((ch) => 
+      ch.brand.toUpperCase() === "ASICS" && Boolean(ch.active)
+    );
     
     if (!asicsChannel) {
-      console.log(`[BROADCAST] Asics order detected maar geen active channel configured`);
+      console.log(`[BROADCAST] ❌ No active Asics channel found`);
       continue;
     }
 
-    console.log(`[BROADCAST] Found active Asics channel:`, asicsChannel.id);
+    console.log(`[BROADCAST] ✅ Found Asics channel: ${asicsChannel.id}`);
 
-    // Create broadcast order for Asics
+    // Create broadcast order
     const claimToken = generateClaimToken();
     const broadcastOrder = broadcastOrdersTable.insert({
       shopify_order_id: order.id?.toString() || "",
@@ -178,22 +196,20 @@ export async function POST(req: NextRequest) {
       notes: null,
     });
 
-    console.log(`[BROADCAST] Created broadcast order:`, broadcastOrder.id);
+    console.log(`[BROADCAST] Created broadcast order #${broadcastOrder.id}`);
 
-    // Post Discord to Asics supplier with claim link
+    // Build Discord message
     const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN || "vibrant-motivation-production-a8c5.up.railway.app";
     const claimUrl = `https://${publicDomain}/broadcast/claim/${broadcastOrder.id}?token=${claimToken}`;
     const rejectUrl = `https://${publicDomain}/broadcast/reject/${broadcastOrder.id}?token=${claimToken}`;
 
-    // Build Discord message without price info
     let discordMsg = `📦 **${orderName}** — Asics order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}`;
-    if (item.size !== "?") {
+    if (item.size) {
       discordMsg += `\n**Size:** EU ${item.size}`;
     }
     discordMsg += `\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
     
-    console.log(`[BROADCAST] Posting Discord message with size: "${item.size}"`);
-    console.log(`[BROADCAST] Full message:\n${discordMsg}`);
+    console.log(`[BROADCAST] Posting Discord message...\n${discordMsg}`);
     await postDiscord(asicsChannel.discord_webhook_url, discordMsg);
   }
 
