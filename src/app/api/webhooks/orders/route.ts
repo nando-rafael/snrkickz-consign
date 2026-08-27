@@ -110,7 +110,8 @@ export async function POST(req: NextRequest) {
     
     const asicsChannel = allChannels.find((ch) => {
       const isBrandMatch = ch.brand.toUpperCase() === "ASICS";
-      const isActive = ch.active === true || ch.active === 1 || ch.active === "true";
+      // Handle active as boolean (it's stored as boolean in the type, but may serialize differently)
+      const isActive = Boolean(ch.active);
       console.log(`[BROADCAST] Channel "${ch.brand}": isBrandMatch=${isBrandMatch}, isActive=${isActive} (raw active=${ch.active}, type=${typeof ch.active})`);
       return isBrandMatch && isActive;
     });
