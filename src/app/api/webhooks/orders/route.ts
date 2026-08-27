@@ -81,18 +81,32 @@ export async function POST(req: NextRequest) {
     if (!itemMatched) {
       // Extract size from properties array - try multiple formats
       let size = "?";
+      
+      console.log(`[BROADCAST] Line item debug for "${li.title}":`, {
+        properties: li.properties,
+        variant_title: li.variant_title,
+        variant_id: li.variant_id,
+      });
+
       if (li.properties && Array.isArray(li.properties)) {
+        console.log(`[BROADCAST] Properties array:`, JSON.stringify(li.properties));
         const sizeProperty = li.properties.find((p: any) => p.name?.toLowerCase() === "size");
+        console.log(`[BROADCAST] Size property found:`, sizeProperty);
         if (sizeProperty?.value) {
           size = sizeProperty.value;
+          console.log(`[BROADCAST] Size extracted from properties: "${size}"`);
         }
       }
+      
       // Fallback: check variant title
       if (size === "?" && li.variant_title) {
         // Try to extract size from variant title (e.g., "Kayano 14 - EU 42")
         const sizeMatch = li.variant_title.match(/EU\s*(\d+(?:\.\d+)?)/i);
         if (sizeMatch) {
           size = sizeMatch[1];
+          console.log(`[BROADCAST] Size extracted from variant_title: "${size}"`);
+        } else {
+          console.log(`[BROADCAST] No size match in variant_title: "${li.variant_title}"`);
         }
       }
 
@@ -178,8 +192,8 @@ export async function POST(req: NextRequest) {
     }
     discordMsg += `\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
     
-    console.log(`[BROADCAST] Posting to Discord webhook for channel ${asicsChannel.id}`);
-    console.log(`[BROADCAST] Size parsed as: "${item.size}"`);
+    console.log(`[BROADCAST] Posting Discord message with size: "${item.size}"`);
+    console.log(`[BROADCAST] Full message:\n${discordMsg}`);
     await postDiscord(asicsChannel.discord_webhook_url, discordMsg);
   }
 
