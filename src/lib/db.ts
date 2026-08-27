@@ -60,6 +60,17 @@ export type Inventory = {
   created_at: string;
 };
 
+export type ProductRequest = {
+  id: number;
+  consigner_id: number;
+  sku: string;
+  product_name: string;
+  stockx_url: string;
+  status: "PENDING" | "APPROVED" | "LIVE" | "REJECTED";
+  created_at: string;
+  handled_at: string | null;
+};
+
 export type BroadcastChannel = {
   id: number;
   brand: string;
@@ -96,17 +107,6 @@ export type BroadcastOrder = {
   created_at: string;
 };
 
-export type ProductRequest = {
-  id: number;
-  consigner_id: number;
-  sku: string;
-  product_name: string;
-  stockx_url: string;
-  status: "PENDING" | "APPROVED" | "LIVE" | "REJECTED";
-  created_at: string;
-  handled_at: string | null;
-};
-
 type Store = {
   broadcastChannels: BroadcastChannel[];
   broadcastOrders: BroadcastOrder[];
@@ -115,12 +115,20 @@ type Store = {
   payouts: Payout[];
   inventory: Inventory[];
   productRequests: ProductRequest[];
-  nextId: { consigner: number; listing: number; payout: number; inventory: number; productRequest: number };
+  nextId: {
+    consigner: number;
+    listing: number;
+    payout: number;
+    inventory: number;
+    productRequest: number;
+    broadcastChannel: number;
+    broadcastOrder: number;
+  };
 };
 
 const empty: Store = {
-  broadcastChannels: [];
-  broadcastOrders: [];
+  broadcastChannels: [],
+  broadcastOrders: [],
   consigners: [],
   listings: [],
   payouts: [],
@@ -135,6 +143,8 @@ function load(): Store {
     const raw = fs.readFileSync(dbFile, "utf8");
     const parsed = JSON.parse(raw) as Partial<Store>;
     return {
+      broadcastChannels: parsed.broadcastChannels ?? [],
+      broadcastOrders: parsed.broadcastOrders ?? [],
       consigners: parsed.consigners ?? [],
       listings: parsed.listings ?? [],
       payouts: parsed.payouts ?? [],
@@ -440,53 +450,12 @@ export const productRequestsTable = {
   },
 };
 
-
 // ── Broadcast Channels ──────────────────────────────────────────
-export type BroadcastChannel = {
-  id: number;
-  brand: string;
-  match_type: "VENDOR" | "TAG" | "TITLE_CONTAINS";
-  match_value: string;
-  discord_webhook_url: string;
-  supplier_email: string;
-  default_payout_percentage: number;
-  active: boolean;
-  created_at: string;
-};
-
-export type BroadcastOrder = {
-  id: number;
-  shopify_order_id: string;
-  shopify_order_name: string;
-  line_item_id: string;
-  product_title: string;
-  sku: string;
-  size: string;
-  image_url: string | null;
-  quantity: number;
-  variant_id: string;
-  product_id: string;
-  sale_price: number;
-  broadcast_channel_id: number;
-  status: "PENDING" | "CLAIMED" | "REJECTED" | "SHIPPED" | "PAID";
-  claimed_by_supplier_email: string | null;
-  claimed_at: string | null;
-  rejected_at: string | null;
-  claim_token: string;
-  payout_amount: number;
-  notes: string | null;
-  created_at: string;
-};
-
 export const broadcastChannelsTable = {
   insert(input: Omit<BroadcastChannel, "id" | "created_at">): BroadcastChannel {
     const store = getStore();
-    if (!("broadcastChannels" in store)) {
-      (store as any).broadcastChannels = [];
-      (store as any).nextId.broadcastChannel = 1;
-    }
     const row: BroadcastChannel = {
-      id: ((store as any).nextId.broadcastChannel)++,
+      id: store.nextId.broadcastChannel++,
       ...input,
       created_at: now(),
     };
@@ -496,27 +465,24 @@ export const broadcastChannelsTable = {
   },
 
   findById(id: number): BroadcastChannel | undefined {
-    const store = getStore() as any;
-    return store.broadcastChannels?.find((c: BroadcastChannel) => c.id === id);
+    return getStore().broadcastChannels.find((c) => c.id === id);
   },
 
   listActive(): BroadcastChannel[] {
-    const store = getStore() as any;
-    return (store.broadcastChannels ?? [])
-      .filter((c: BroadcastChannel) => c.active)
-      .sort((a: BroadcastChannel, b: BroadcastChannel) => b.created_at.localeCompare(a.created_at));
+    return getStore()
+      .broadcastChannels.filter((c) => c.active)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
 
   listAll(): BroadcastChannel[] {
-    const store = getStore() as any;
-    return (store.broadcastChannels ?? [])
-      .slice()
-      .sort((a: BroadcastChannel, b: BroadcastChannel) => b.created_at.localeCompare(a.created_at));
+    return getStore()
+      .broadcastChannels.slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
 
   update(id: number, input: Partial<Omit<BroadcastChannel, "id" | "created_at">>): BroadcastChannel | undefined {
-    const store = getStore() as any;
-    const row = store.broadcastChannels?.find((c: BroadcastChannel) => c.id === id);
+    const store = getStore();
+    const row = store.broadcastChannels.find((c) => c.id === id);
     if (!row) return undefined;
     Object.assign(row, input);
     save(store);
@@ -524,8 +490,8 @@ export const broadcastChannelsTable = {
   },
 
   delete(id: number): boolean {
-    const store = getStore() as any;
-    const index = store.broadcastChannels?.findIndex((c: BroadcastChannel) => c.id === id) ?? -1;
+    const store = getStore();
+    const index = store.broadcastChannels.findIndex((c) => c.id === id);
     if (index === -1) return false;
     store.broadcastChannels.splice(index, 1);
     save(store);
@@ -533,15 +499,12 @@ export const broadcastChannelsTable = {
   },
 };
 
+// ── Broadcast Orders ────────────────────────────────────────────
 export const broadcastOrdersTable = {
   insert(input: Omit<BroadcastOrder, "id" | "created_at">): BroadcastOrder {
     const store = getStore();
-    if (!("broadcastOrders" in store)) {
-      (store as any).broadcastOrders = [];
-      (store as any).nextId.broadcastOrder = 1;
-    }
     const row: BroadcastOrder = {
-      id: ((store as any).nextId.broadcastOrder)++,
+      id: store.nextId.broadcastOrder++,
       ...input,
       created_at: now(),
     };
@@ -551,42 +514,38 @@ export const broadcastOrdersTable = {
   },
 
   findById(id: number): BroadcastOrder | undefined {
-    const store = getStore() as any;
-    return store.broadcastOrders?.find((o: BroadcastOrder) => o.id === id);
+    return getStore().broadcastOrders.find((o) => o.id === id);
   },
 
   findByClaimToken(token: string): BroadcastOrder | undefined {
-    const store = getStore() as any;
-    return store.broadcastOrders?.find((o: BroadcastOrder) => o.claim_token === token);
+    return getStore().broadcastOrders.find((o) => o.claim_token === token);
   },
 
   findPendingByLineItemId(lineItemId: string): BroadcastOrder | undefined {
-    const store = getStore() as any;
-    return store.broadcastOrders?.find(
-      (o: BroadcastOrder) => o.line_item_id === lineItemId && o.status === "PENDING"
+    return getStore().broadcastOrders.find(
+      (o) => o.line_item_id === lineItemId && o.status === "PENDING"
     );
   },
 
   listPending(): BroadcastOrder[] {
-    const store = getStore() as any;
-    return (store.broadcastOrders ?? [])
-      .filter((o: BroadcastOrder) => o.status === "PENDING")
-      .sort((a: BroadcastOrder, b: BroadcastOrder) => b.created_at.localeCompare(a.created_at));
+    return getStore()
+      .broadcastOrders.filter((o) => o.status === "PENDING")
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
 
   listAll(): BroadcastOrder[] {
-    const store = getStore() as any;
-    return (store.broadcastOrders ?? [])
-      .slice()
-      .sort((a: BroadcastOrder, b: BroadcastOrder) => b.created_at.localeCompare(a.created_at));
+    return getStore()
+      .broadcastOrders.slice()
+      .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
 
   update(id: number, input: Partial<Omit<BroadcastOrder, "id" | "created_at">>): BroadcastOrder | undefined {
-    const store = getStore() as any;
-    const row = store.broadcastOrders?.find((o: BroadcastOrder) => o.id === id);
+    const store = getStore();
+    const row = store.broadcastOrders.find((o) => o.id === id);
     if (!row) return undefined;
     Object.assign(row, input);
     save(store);
     return row;
   },
 };
+
