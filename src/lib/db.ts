@@ -60,6 +60,42 @@ export type Inventory = {
   created_at: string;
 };
 
+export type BroadcastChannel = {
+  id: number;
+  brand: string;
+  match_type: "VENDOR" | "TAG" | "TITLE_CONTAINS";
+  match_value: string;
+  discord_webhook_url: string;
+  supplier_email: string;
+  default_payout_percentage: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type BroadcastOrder = {
+  id: number;
+  shopify_order_id: string;
+  shopify_order_name: string;
+  line_item_id: string;
+  product_title: string;
+  sku: string;
+  size: string;
+  image_url: string | null;
+  quantity: number;
+  variant_id: string;
+  product_id: string;
+  sale_price: number;
+  broadcast_channel_id: number;
+  status: "PENDING" | "CLAIMED" | "REJECTED" | "SHIPPED" | "PAID";
+  claimed_by_supplier_email: string | null;
+  claimed_at: string | null;
+  rejected_at: string | null;
+  claim_token: string;
+  payout_amount: number;
+  notes: string | null;
+  created_at: string;
+};
+
 export type ProductRequest = {
   id: number;
   consigner_id: number;
@@ -72,6 +108,8 @@ export type ProductRequest = {
 };
 
 type Store = {
+  broadcastChannels: BroadcastChannel[];
+  broadcastOrders: BroadcastOrder[];
   consigners: Consigner[];
   listings: Listing[];
   payouts: Payout[];
@@ -81,12 +119,14 @@ type Store = {
 };
 
 const empty: Store = {
+  broadcastChannels: [];
+  broadcastOrders: [];
   consigners: [],
   listings: [],
   payouts: [],
   inventory: [],
   productRequests: [],
-  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1, productRequest: 1 },
+  nextId: { consigner: 1, listing: 1, payout: 1, inventory: 1, productRequest: 1, broadcastChannel: 1, broadcastOrder: 1 },
 };
 
 function load(): Store {
@@ -106,6 +146,8 @@ function load(): Store {
         payout: parsed.nextId?.payout ?? 1,
         inventory: parsed.nextId?.inventory ?? 1,
         productRequest: parsed.nextId?.productRequest ?? 1,
+        broadcastChannel: parsed.nextId?.broadcastChannel ?? 1,
+        broadcastOrder: parsed.nextId?.broadcastOrder ?? 1,
       },
     };
   } catch {
@@ -398,3 +440,153 @@ export const productRequestsTable = {
   },
 };
 
+
+// ── Broadcast Channels ──────────────────────────────────────────
+export type BroadcastChannel = {
+  id: number;
+  brand: string;
+  match_type: "VENDOR" | "TAG" | "TITLE_CONTAINS";
+  match_value: string;
+  discord_webhook_url: string;
+  supplier_email: string;
+  default_payout_percentage: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type BroadcastOrder = {
+  id: number;
+  shopify_order_id: string;
+  shopify_order_name: string;
+  line_item_id: string;
+  product_title: string;
+  sku: string;
+  size: string;
+  image_url: string | null;
+  quantity: number;
+  variant_id: string;
+  product_id: string;
+  sale_price: number;
+  broadcast_channel_id: number;
+  status: "PENDING" | "CLAIMED" | "REJECTED" | "SHIPPED" | "PAID";
+  claimed_by_supplier_email: string | null;
+  claimed_at: string | null;
+  rejected_at: string | null;
+  claim_token: string;
+  payout_amount: number;
+  notes: string | null;
+  created_at: string;
+};
+
+export const broadcastChannelsTable = {
+  insert(input: Omit<BroadcastChannel, "id" | "created_at">): BroadcastChannel {
+    const store = getStore();
+    if (!("broadcastChannels" in store)) {
+      (store as any).broadcastChannels = [];
+      (store as any).nextId.broadcastChannel = 1;
+    }
+    const row: BroadcastChannel = {
+      id: ((store as any).nextId.broadcastChannel)++,
+      ...input,
+      created_at: now(),
+    };
+    (store as any).broadcastChannels.push(row);
+    save(store);
+    return row;
+  },
+
+  findById(id: number): BroadcastChannel | undefined {
+    const store = getStore() as any;
+    return store.broadcastChannels?.find((c: BroadcastChannel) => c.id === id);
+  },
+
+  listActive(): BroadcastChannel[] {
+    const store = getStore() as any;
+    return (store.broadcastChannels ?? [])
+      .filter((c: BroadcastChannel) => c.active)
+      .sort((a: BroadcastChannel, b: BroadcastChannel) => b.created_at.localeCompare(a.created_at));
+  },
+
+  listAll(): BroadcastChannel[] {
+    const store = getStore() as any;
+    return (store.broadcastChannels ?? [])
+      .slice()
+      .sort((a: BroadcastChannel, b: BroadcastChannel) => b.created_at.localeCompare(a.created_at));
+  },
+
+  update(id: number, input: Partial<Omit<BroadcastChannel, "id" | "created_at">>): BroadcastChannel | undefined {
+    const store = getStore() as any;
+    const row = store.broadcastChannels?.find((c: BroadcastChannel) => c.id === id);
+    if (!row) return undefined;
+    Object.assign(row, input);
+    save(store);
+    return row;
+  },
+
+  delete(id: number): boolean {
+    const store = getStore() as any;
+    const index = store.broadcastChannels?.findIndex((c: BroadcastChannel) => c.id === id) ?? -1;
+    if (index === -1) return false;
+    store.broadcastChannels.splice(index, 1);
+    save(store);
+    return true;
+  },
+};
+
+export const broadcastOrdersTable = {
+  insert(input: Omit<BroadcastOrder, "id" | "created_at">): BroadcastOrder {
+    const store = getStore();
+    if (!("broadcastOrders" in store)) {
+      (store as any).broadcastOrders = [];
+      (store as any).nextId.broadcastOrder = 1;
+    }
+    const row: BroadcastOrder = {
+      id: ((store as any).nextId.broadcastOrder)++,
+      ...input,
+      created_at: now(),
+    };
+    (store as any).broadcastOrders.push(row);
+    save(store);
+    return row;
+  },
+
+  findById(id: number): BroadcastOrder | undefined {
+    const store = getStore() as any;
+    return store.broadcastOrders?.find((o: BroadcastOrder) => o.id === id);
+  },
+
+  findByClaimToken(token: string): BroadcastOrder | undefined {
+    const store = getStore() as any;
+    return store.broadcastOrders?.find((o: BroadcastOrder) => o.claim_token === token);
+  },
+
+  findPendingByLineItemId(lineItemId: string): BroadcastOrder | undefined {
+    const store = getStore() as any;
+    return store.broadcastOrders?.find(
+      (o: BroadcastOrder) => o.line_item_id === lineItemId && o.status === "PENDING"
+    );
+  },
+
+  listPending(): BroadcastOrder[] {
+    const store = getStore() as any;
+    return (store.broadcastOrders ?? [])
+      .filter((o: BroadcastOrder) => o.status === "PENDING")
+      .sort((a: BroadcastOrder, b: BroadcastOrder) => b.created_at.localeCompare(a.created_at));
+  },
+
+  listAll(): BroadcastOrder[] {
+    const store = getStore() as any;
+    return (store.broadcastOrders ?? [])
+      .slice()
+      .sort((a: BroadcastOrder, b: BroadcastOrder) => b.created_at.localeCompare(a.created_at));
+  },
+
+  update(id: number, input: Partial<Omit<BroadcastOrder, "id" | "created_at">>): BroadcastOrder | undefined {
+    const store = getStore() as any;
+    const row = store.broadcastOrders?.find((o: BroadcastOrder) => o.id === id);
+    if (!row) return undefined;
+    Object.assign(row, input);
+    save(store);
+    return row;
+  },
+};
