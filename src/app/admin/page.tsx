@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { listingsTable, payoutsTable, consignersTable, inventoryTable, productRequestsTable } from "@/lib/db";
+import { listingsTable, payoutsTable, consignersTable, inventoryTable, productRequestsTable, broadcastOrdersTable } from "@/lib/db";
 import { getSession, isAdmin } from "@/lib/auth";
 import { euro, feePct } from "@/lib/config";
 import InventorySection from "./InventorySection";
@@ -7,6 +7,7 @@ import ProductRequestsSection from "./ProductRequestsSection";
 import ListingsSection from "./ListingsSection";
 import SalesSection from "./SalesSection";
 import ConsignersSection from "./ConsignersSection";
+import BroadcastOrdersSection from "./BroadcastOrdersSection";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,8 @@ export default async function AdminPage() {
 
       <InventorySection initialItems={inventory} />
 
+      <BroadcastOrdersSection />
+
       <h2 className="section-title">Openstaande uitbetalingen ({pendingPayouts.length})</h2>
       <div className="table-wrap">
         {pendingPayouts.length === 0 ? <div className="empty">Geen openstaande uitbetalingen.</div> : (
@@ -115,3 +118,4 @@ export default async function AdminPage() {
     </main>
   );
 }
+
