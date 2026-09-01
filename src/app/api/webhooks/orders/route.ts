@@ -72,6 +72,49 @@ function extractSize(li: any): string {
   return "";
 }
 
+// Helper function to extract payment method from order
+function extractPaymentMethod(order: any): string {
+  // Method 1: Check payment_gateway_names (most reliable)
+  if (order.payment_gateway_names && Array.isArray(order.payment_gateway_names)) {
+    if (order.payment_gateway_names.length > 0) {
+      return order.payment_gateway_names[0];
+    }
+  }
+  
+  // Method 2: Check transactions array
+  if (order.transactions && Array.isArray(order.transactions)) {
+    const successfulTx = order.transactions.find((tx: any) => tx.status === "success");
+    if (successfulTx?.gateway) {
+      return successfulTx.gateway;
+    }
+  }
+  
+  // Method 3: Fallback to gateway
+  if (order.gateway) {
+    return order.gateway;
+  }
+  
+  return "Unknown";
+}
+
+// Payout time mapping based on payment method
+function getPayoutTime(paymentMethod: string): { method: string; time: string } {
+  const normalized = paymentMethod.toLowerCase().trim();
+  
+  if (normalized.includes("ideal")) {
+    return { method: "iDEAL", time: "48H" };
+  }
+  if (normalized.includes("revolut")) {
+    return { method: "Revolut", time: "24H" };
+  }
+  if (normalized.includes("klarna")) {
+    return { method: "Klarna", time: "9 Days" };
+  }
+  
+  // Default fallback
+  return { method: paymentMethod, time: "Unknown" };
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
@@ -84,7 +127,11 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: "Ongeldige payload" }, { status: 400 }); }
 
   const orderName: string = order?.name || `#${order?.order_number || "?"}`;
+  const paymentMethod = extractPaymentMethod(order);
+  const payoutInfo = getPayoutTime(paymentMethod);
   const lineItems: any[] = order?.line_items || [];
+
+  console.log(`[ORDER] ${orderName} - Payment method: ${paymentMethod}, Payout time: ${payoutInfo.time}`);
 
   let matched = 0;
   const touchedVariants = new Set<string>();
@@ -159,6 +206,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[BROADCAST] Processing Asics broadcast order: ${item.productTitle}`);
     console.log(`[BROADCAST]   Size for Discord: "${item.size}"`);
+    console.log(`[BROADCAST]   Payout info: ${payoutInfo.method} - ${payoutInfo.time}`);
     
     // Find Asics broadcast channel
     const asicsChannel = broadcastChannelsTable.listAll().find((ch) => 
@@ -207,6 +255,7 @@ export async function POST(req: NextRequest) {
     if (item.size) {
       discordMsg += `\n**Size:** EU ${item.size}`;
     }
+    discordMsg += `\n**Payment method:** ${payoutInfo.method}\n**Payout time:** ${payoutInfo.time}`;
     discordMsg += `\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
     
     console.log(`[BROADCAST] Posting Discord message...\n${discordMsg}`);
@@ -225,7 +274,9 @@ export async function POST(req: NextRequest) {
       await sendDiscordNotification(
         consigner.discord_webhook_url,
         notif.listing,
-        notif.orderName
+        notif.orderName,
+        payoutInfo.method,
+        payoutInfo.time
       );
     }
   }

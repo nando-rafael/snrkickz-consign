@@ -7,46 +7,66 @@ export async function sendDiscordNotification(
     sale_price: number;
     payout: number;
   },
-  orderName: string
+  orderName: string,
+  paymentMethod?: string,
+  payoutTime?: string
 ): Promise<boolean> {
   if (!webhookUrl) return false;
 
   try {
+    const fields = [
+      {
+        name: "Product",
+        value: listing.product_title || "Onbekend",
+        inline: false,
+      },
+      {
+        name: "SKU",
+        value: listing.sku,
+        inline: true,
+      },
+      {
+        name: "Maat",
+        value: listing.size,
+        inline: true,
+      },
+      {
+        name: "Verkoopprijs",
+        value: `€${listing.sale_price.toFixed(2)}`,
+        inline: true,
+      },
+      {
+        name: "Jouw uitbetaling",
+        value: `€${listing.payout.toFixed(2)}`,
+        inline: true,
+      },
+      {
+        name: "Order",
+        value: orderName,
+        inline: false,
+      },
+    ];
+
+    // Add payment method and payout time if provided
+    if (paymentMethod) {
+      fields.push({
+        name: "Payment method",
+        value: paymentMethod,
+        inline: true,
+      });
+    }
+    if (payoutTime) {
+      fields.push({
+        name: "Payout time",
+        value: payoutTime,
+        inline: true,
+      });
+    }
+
     const embed = {
       title: "🎉 Item verkocht!",
       color: 0x00ff00,
-      fields: [
-        {
-          name: "Product",
-          value: listing.product_title || "Onbekend",
-          inline: false,
-        },
-        {
-          name: "SKU",
-          value: listing.sku,
-          inline: true,
-        },
-        {
-          name: "Maat",
-          value: listing.size,
-          inline: true,
-        },
-        {
-          name: "Verkoopprijs",
-          value: `€${listing.sale_price.toFixed(2)}`,
-          inline: true,
-        },
-        {
-          name: "Jouw uitbetaling",
-          value: `€${listing.payout.toFixed(2)}`,
-          inline: true,
-        },
-        {
-          name: "Order",
-          value: orderName,
-          inline: false,
-        },
-      ],
+      fields: fields,
       timestamp: new Date().toISOString(),
     };
 
