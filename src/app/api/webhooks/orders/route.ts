@@ -72,6 +72,31 @@ function extractSize(li: any): string {
   return "";
 }
 
+// Helper function to extract payment method from order
+function extractPaymentMethod(order: any): string {
+  // Method 1: Check payment_gateway_names (most reliable)
+  if (order.payment_gateway_names && Array.isArray(order.payment_gateway_names)) {
+    if (order.payment_gateway_names.length > 0) {
+      return order.payment_gateway_names[0];
+    }
+  }
+  
+  // Method 2: Check transactions array
+  if (order.transactions && Array.isArray(order.transactions)) {
+    const successfulTx = order.transactions.find((tx: any) => tx.status === "success");
+    if (successfulTx?.gateway) {
+      return successfulTx.gateway;
+    }
+  }
+  
+  // Method 3: Fallback to gateway
+  if (order.gateway) {
+    return order.gateway;
+  }
+  
+  return "Unknown";
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
@@ -84,7 +109,10 @@ export async function POST(req: NextRequest) {
   catch { return NextResponse.json({ error: "Ongeldige payload" }, { status: 400 }); }
 
   const orderName: string = order?.name || `#${order?.order_number || "?"}`;
+  const paymentMethod = extractPaymentMethod(order);
   const lineItems: any[] = order?.line_items || [];
+
+  console.log(`[ORDER] ${orderName} - Payment method: ${paymentMethod}`);
 
   let matched = 0;
   const touchedVariants = new Set<string>();
