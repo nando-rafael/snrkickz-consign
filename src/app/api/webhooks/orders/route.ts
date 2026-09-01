@@ -274,7 +274,9 @@ export async function POST(req: NextRequest) {
       await sendDiscordNotification(
         consigner.discord_webhook_url,
         notif.listing,
-        notif.orderName
+        notif.orderName,
+        payoutInfo.method,
+        payoutInfo.time
       );
     }
   }
