@@ -4,17 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Consigner } from "@/lib/db";
 
-type OrderManager = Consigner & {
-  created_at: string;
-};
-
 type Props = {
-  initialManagers: OrderManager[];
+  initialManagers: Consigner[];
 };
 
 export default function TeamSection({ initialManagers }: Props) {
   const router = useRouter();
-  const [managers, setManagers] = useState<OrderManager[]>(initialManagers);
+  const [managers, setManagers] = useState<Consigner[]>(initialManagers);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -34,7 +30,7 @@ export default function TeamSection({ initialManagers }: Props) {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/ordermanagers", {
+      const res = await fetch("/api/admin/team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,7 +66,7 @@ export default function TeamSection({ initialManagers }: Props) {
     setDeletingId(id);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/ordermanagers/${id}`, {
+      const res = await fetch(`/api/admin/team/${id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       });
