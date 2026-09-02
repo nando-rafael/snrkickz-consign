@@ -145,14 +145,14 @@ function load(): Store {
     if (!fs.existsSync(dbFile)) return JSON.parse(JSON.stringify(empty));
     const raw = fs.readFileSync(dbFile, "utf8");
     const parsed = JSON.parse(raw) as Partial<Store>;
-
+    
     // Migration: apply ADMIN_EMAILS to role field
     const adminEmails = (process.env.ADMIN_EMAILS || "")
       .toLowerCase()
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-
+    
     const consigners = (parsed.consigners ?? []).map((c: any) => ({
       ...c,
       role: c.role || (adminEmails.includes(c.email.toLowerCase()) ? "ADMIN" : "CONSIGNER"),

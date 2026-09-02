@@ -9,6 +9,7 @@ import SalesSection from "./SalesSection";
 import ConsignersSection from "./ConsignersSection";
 import BroadcastOrdersSection from "./BroadcastOrdersSection";
 import BroadcastChannelsSection from "./BroadcastChannelsSection";
+import TeamSection from "./TeamSection";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function AdminPage() {
 
   const isAdminUser = isAdmin(session.role);
   const allListings = listingsTable.listAll();
+  const allConsigners = consignersTable.listAll();
 
   const listings = allListings.map((l) => {
     const c = consignersTable.findById(l.consigner_id);
@@ -55,7 +57,7 @@ export default async function AdminPage() {
   const pendingSum = pendingPayouts.reduce((s, p) => s + p.amount, 0);
   const feeEarned = sold.reduce((s, l) => s + (l.sale_price - l.payout), 0);
 
-  const consigners = consignersTable.listAll().map((c) => {
+  const consigners = allConsigners.map((c) => {
     const cListings = allListings.filter((l) => l.consigner_id === c.id);
     const activeCount = cListings.filter((l) => l.status === "ACTIVE").length;
     const soldCount = cListings.filter((l) => l.status === "SOLD").length;
@@ -64,6 +66,9 @@ export default async function AdminPage() {
       .reduce((s, p) => s + p.amount, 0);
     return { ...c, activeCount, soldCount, pendingPayout };
   });
+
+  // For Team section: only show ORDERMANAGER users
+  const ordermanagers = consigners.filter((c) => c.role === "ORDERMANAGER");
 
   return (
     <main className="page container">
@@ -76,14 +81,19 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      <div className="stats">
-        <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
-        <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
-      </div>
+      {/* HIDE for ORDERMANAGER: Stats */}
+      {isAdminUser && (
+        <div className="stats">
+          <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
+          <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
+          <div className="stat"><div className="label">Fee verdiend</div><div className="value">{euro(feeEarned)}</div></div>
+          <div className="stat"><div className="label">Uit te betalen</div><div className="value">{euro(pendingSum)}</div></div>
+        </div>
+      )}
 
-      <ProductRequestsSection initialRequests={allProductRequests} />
+      <ProductRequestsSection initialRequests={allProductRequests} isAdmin={isAdminUser} />
 
-      <ConsignersSection initialConsigners={consigners} />
+      <ConsignersSection initialConsigners={consigners} isAdmin={isAdminUser} />
 
       {isAdminUser && <InventorySection initialItems={inventory} />}
 
@@ -91,6 +101,10 @@ export default async function AdminPage() {
 
       {isAdminUser && <BroadcastOrdersSection />}
 
+      {/* Team Management - ADMIN ONLY */}
+      {isAdminUser && <TeamSection initialManagers={ordermanagers} />}
+
+      {/* HIDE for ORDERMANAGER: Openstaande uitbetalingen */}
       {isAdminUser && (
         <>
           <h2 className="section-title">Openstaande uitbetalingen ({pendingPayouts.length})</h2>
@@ -121,7 +135,7 @@ export default async function AdminPage() {
         </>
       )}
 
-      <SalesSection initialListings={soldListings} hideMargin={!isAdminUser} />
+      <SalesSection initialListings={soldListings} isAdmin={isAdminUser} />
 
       {isAdminUser && <ListingsSection initialListings={active} />}
     </main>

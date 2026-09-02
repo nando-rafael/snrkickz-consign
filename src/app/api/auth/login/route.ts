@@ -21,8 +21,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Create session with role
   await createSession({ id: user.id, email: user.email, name: user.name, role: user.role });
 
+  // Redirect based on role
   const redirectPath = (user.role === "ADMIN" || user.role === "ORDERMANAGER") ? "/admin" : "/dashboard";
   return NextResponse.redirect(redirectTo(req, redirectPath), 303);
 }

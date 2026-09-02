@@ -58,3 +58,7 @@ export function isAdminOrOrderManager(role: ConsignerRole | undefined | null): b
   return role === "ADMIN" || role === "ORDERMANAGER";
 }
 
+export function isConsigner(role: ConsignerRole | undefined | null): boolean {
+  return role === "CONSIGNER";
+}
+
