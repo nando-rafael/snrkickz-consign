@@ -11,6 +11,7 @@ type RequestWithConsigner = ProductRequest & {
 
 type Props = {
   initialRequests: RequestWithConsigner[];
+  isAdmin?: boolean;
 };
 
 const STATUS_LABEL: Record<ProductRequest["status"], string> = {
