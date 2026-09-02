@@ -13,16 +13,17 @@ type ConsignerWithStats = Consigner & {
 
 type Props = {
   initialConsigners: ConsignerWithStats[];
-  isAdmin?: boolean;
 };
 
-export default function ConsignersSection({ initialConsigners, isAdmin = true }: Props) {
+export default function ConsignersSection({ initialConsigners }: Props) {
   const router = useRouter();
   const [consigners, setConsigners] = useState<ConsignerWithStats[]>(initialConsigners);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editRole, setEditRole] = useState<"CONSIGNER" | "ORDERMANAGER">("CONSIGNER");
 
   async function handleDelete(id: number, name: string) {
     if (
@@ -61,6 +62,37 @@ export default function ConsignersSection({ initialConsigners, isAdmin = true }:
     }
   }
 
+  async function handleUpdateRole(id: number) {
+    setLoadingId(id);
+    setErrorMsg(null);
+
+    try {
+      const res = await fetch(`/api/admin/consigners/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: editRole }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setErrorMsg(data.error || "Update mislukt.");
+      } else {
+        setConsigners((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, role: editRole } : c))
+        );
+        setSuccessMsg(`✓ Rol gewijzigd naar ${editRole}`);
+        setTimeout(() => setSuccessMsg(null), 4000);
+        setEditingId(null);
+        router.refresh();
+      }
+    } catch {
+      setErrorMsg("Netwerkfout. Probeer opnieuw.");
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return consigners;
 
@@ -74,9 +106,7 @@ export default function ConsignersSection({ initialConsigners, isAdmin = true }:
 
   return (
     <>
-      <h2 className="section-title">
-        {isAdmin ? "Consigners" : "Team"} ({filtered.length})
-      </h2>
+      <h2 className="section-title">Consigners ({filtered.length})</h2>
 
       {successMsg && (
         <div
@@ -123,9 +153,7 @@ export default function ConsignersSection({ initialConsigners, isAdmin = true }:
       <div className="table-wrap">
         {filtered.length === 0 ? (
           <div className="empty">
-            {searchQuery
-              ? "Geen personen gevonden."
-              : "Geen personen gevonden."}
+            {searchQuery ? "Geen personen gevonden." : "Geen personen gevonden."}
           </div>
         ) : (
           <table>
@@ -133,13 +161,14 @@ export default function ConsignersSection({ initialConsigners, isAdmin = true }:
               <tr>
                 <th>Naam</th>
                 <th>Email</th>
-                {isAdmin && <th>IBAN</th>}
+                <th>Rol</th>
+                <th>IBAN</th>
                 <th>Discord</th>
-                {isAdmin && <th>Webhook URL</th>}
+                <th>Webhook URL</th>
                 <th>Live</th>
                 <th>Verkocht</th>
-                {isAdmin && <th>Uitbetaling</th>}
-                {isAdmin && <th>Acties</th>}
+                <th>Uitbetaling</th>
+                <th>Acties</th>
               </tr>
             </thead>
             <tbody>
@@ -149,50 +178,99 @@ export default function ConsignersSection({ initialConsigners, isAdmin = true }:
                   <td>
                     <span className="size-chip">{c.email}</span>
                   </td>
-                  {isAdmin && (
-                    <td>
-                      <span className="size-chip">{c.iban || "—"}</span>
-                    </td>
-                  )}
+                  <td>
+                    {editingId === c.id ? (
+                      <select
+                        value={editRole}
+                        onChange={(e) => setEditRole(e.target.value as any)}
+                        style={{
+                          padding: "4px 8px",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          background: "var(--card)",
+                          color: "var(--fg)",
+                          fontSize: 13,
+                        }}
+                      >
+                        <option value="CONSIGNER">CONSIGNER</option>
+                        <option value="ORDERMANAGER">ORDERMANAGER</option>
+                      </select>
+                    ) : (
+                      <span className="size-chip">{c.role || "CONSIGNER"}</span>
+                    )}
+                  </td>
+                  <td>
+                    <span className="size-chip">{c.iban || "—"}</span>
+                  </td>
                   <td>
                     <span className="size-chip">
                       {c.discord_username || "—"}
                     </span>
                   </td>
-                  {isAdmin && (
-                    <td>
-                      {c.discord_webhook_url ? (
-                        <span
-                          className="size-chip"
-                          title={c.discord_webhook_url}
-                        >
-                          ✓ ingesteld
-                        </span>
-                      ) : (
-                        <span className="size-chip">—</span>
-                      )}
-                    </td>
-                  )}
+                  <td>
+                    {c.discord_webhook_url ? (
+                      <span className="size-chip" title={c.discord_webhook_url}>
+                        ✓ ingesteld
+                      </span>
+                    ) : (
+                      <span className="size-chip">—</span>
+                    )}
+                  </td>
                   <td className="num">{c.activeCount}</td>
                   <td className="num">{c.soldCount}</td>
-                  {isAdmin && (
-                    <td className="num">
-                      {c.pendingPayout > 0 ? euro(c.pendingPayout) : "—"}
-                    </td>
-                  )}
-                  {isAdmin && (
-                    <td>
-                      <button
-                        className="btn danger sm"
-                        type="button"
-                        disabled={loadingId === c.id}
-                        onClick={() => handleDelete(c.id, c.name)}
-                        title="Account verwijderen"
-                      >
-                        🗑️
-                      </button>
-                    </td>
-                  )}
+                  <td className="num">
+                    {c.pendingPayout > 0 ? euro(c.pendingPayout) : "—"}
+                  </td>
+                  <td>
+                    {editingId === c.id ? (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="btn sm"
+                          type="button"
+                          disabled={loadingId === c.id}
+                          onClick={() => handleUpdateRole(c.id)}
+                          style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e" }}
+                        >
+                          Opslaan
+                        </button>
+                        <button
+                          className="btn sm ghost"
+                          type="button"
+                          disabled={loadingId === c.id}
+                          onClick={() => {
+                            setEditingId(null);
+                            setErrorMsg(null);
+                          }}
+                        >
+                          Annuleren
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          className="btn sm ghost"
+                          type="button"
+                          disabled={loadingId === c.id}
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditRole(c.role || "CONSIGNER");
+                          }}
+                          title="Rol wijzigen"
+                        >
+                          ✎️
+                        </button>
+                        <button
+                          className="btn danger sm"
+                          type="button"
+                          disabled={loadingId === c.id}
+                          onClick={() => handleDelete(c.id, c.name)}
+                          title="Account verwijderen"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
