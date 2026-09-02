@@ -182,7 +182,7 @@ export default function ConsignersSection({ initialConsigners }: Props) {
                     {editingId === c.id ? (
                       <select
                         value={editRole}
-                        onChange={(e) => setEditRole(e.target.value as any)}
+                        onChange={(e) => setEditRole(e.target.value as "CONSIGNER" | "ORDERMANAGER")}
                         style={{
                           padding: "4px 8px",
                           border: "1px solid var(--border)",
@@ -253,7 +253,12 @@ export default function ConsignersSection({ initialConsigners }: Props) {
                           disabled={loadingId === c.id}
                           onClick={() => {
                             setEditingId(c.id);
-                            setEditRole(c.role || "CONSIGNER");
+                            const role = c.role as string;
+                            if (role === "ADMIN" || role === "ORDERMANAGER") {
+                              setEditRole("ORDERMANAGER");
+                            } else {
+                              setEditRole("CONSIGNER");
+                            }
                           }}
                           title="Rol wijzigen"
                         >
