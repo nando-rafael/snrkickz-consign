@@ -11,6 +11,7 @@ type RequestWithConsigner = ProductRequest & {
 
 type Props = {
   initialRequests: RequestWithConsigner[];
+  isAdmin?: boolean;
 };
 
 const STATUS_LABEL: Record<ProductRequest["status"], string> = {
@@ -49,7 +50,7 @@ function StatusBadge({ status }: { status: ProductRequest["status"] }) {
   );
 }
 
-export default function ProductRequestsSection({ initialRequests }: Props) {
+export default function ProductRequestsSection({ initialRequests, isAdmin = false }: Props) {
   const router = useRouter();
   const [requests, setRequests] = useState<RequestWithConsigner[]>(initialRequests);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -240,3 +241,4 @@ export default function ProductRequestsSection({ initialRequests }: Props) {
     </>
   );
 }
+
