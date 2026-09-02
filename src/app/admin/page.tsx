@@ -91,9 +91,9 @@ export default async function AdminPage() {
         </div>
       )}
 
-      <ProductRequestsSection initialRequests={allProductRequests} isAdmin={isAdminUser} />
+      <ProductRequestsSection initialRequests={allProductRequests} hideMargin={!isAdminUser} />
 
-      <ConsignersSection initialConsigners={consigners} isAdmin={isAdminUser} />
+      <ConsignersSection initialConsigners={consigners} hideMargin={!isAdminUser} />
 
       {isAdminUser && <InventorySection initialItems={inventory} />}
 
@@ -135,7 +135,7 @@ export default async function AdminPage() {
         </>
       )}
 
-      <SalesSection initialListings={soldListings} isAdmin={isAdminUser} />
+      <SalesSection initialListings={soldListings} hideMargin={!isAdminUser} />
 
       {isAdminUser && <ListingsSection initialListings={active} />}
     </main>
