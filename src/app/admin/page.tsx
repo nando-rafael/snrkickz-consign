@@ -20,6 +20,7 @@ export default async function AdminPage() {
 
   const isAdminUser = isAdmin(session.role);
   const allListings = listingsTable.listAll();
+  const allConsigners = consignersTable.listAll();
 
   const listings = allListings.map((l) => {
     const c = consignersTable.findById(l.consigner_id);
@@ -56,7 +57,7 @@ export default async function AdminPage() {
   const pendingSum = pendingPayouts.reduce((s, p) => s + p.amount, 0);
   const feeEarned = sold.reduce((s, l) => s + (l.sale_price - l.payout), 0);
 
-  const consigners = consignersTable.listAll().map((c) => {
+  const consigners = allConsigners.map((c) => {
     const cListings = allListings.filter((l) => l.consigner_id === c.id);
     const activeCount = cListings.filter((l) => l.status === "ACTIVE").length;
     const soldCount = cListings.filter((l) => l.status === "SOLD").length;
