@@ -4,11 +4,14 @@ import path from "path";
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const dbFile = path.join(dataDir, "store.json");
 
+export type ConsignerRole = "ADMIN" | "ORDERMANAGER" | "CONSIGNER";
+
 export type Consigner = {
   id: number;
   email: string;
   name: string;
   password_hash: string;
+  role: ConsignerRole;
   iban: string | null;
   discord_username: string | null;
   discord_webhook_url: string | null;
@@ -142,10 +145,23 @@ function load(): Store {
     if (!fs.existsSync(dbFile)) return JSON.parse(JSON.stringify(empty));
     const raw = fs.readFileSync(dbFile, "utf8");
     const parsed = JSON.parse(raw) as Partial<Store>;
+    
+    // Migration: apply ADMIN_EMAILS to role field
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .toLowerCase()
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    
+    const consigners = (parsed.consigners ?? []).map((c: any) => ({
+      ...c,
+      role: c.role || (adminEmails.includes(c.email.toLowerCase()) ? "ADMIN" : "CONSIGNER"),
+    }));
+
     return {
       broadcastChannels: parsed.broadcastChannels ?? [],
       broadcastOrders: parsed.broadcastOrders ?? [],
-      consigners: parsed.consigners ?? [],
+      consigners,
       listings: parsed.listings ?? [],
       payouts: parsed.payouts ?? [],
       inventory: parsed.inventory ?? [],
