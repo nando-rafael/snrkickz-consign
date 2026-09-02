@@ -4,11 +4,14 @@ import path from "path";
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const dbFile = path.join(dataDir, "store.json");
 
+export type ConsignerRole = "ADMIN" | "ORDERMANAGER" | "CONSIGNER";
+
 export type Consigner = {
   id: number;
   email: string;
   name: string;
   password_hash: string;
+  role: ConsignerRole;
   iban: string | null;
   discord_username: string | null;
   discord_webhook_url: string | null;
@@ -142,10 +145,23 @@ function load(): Store {
     if (!fs.existsSync(dbFile)) return JSON.parse(JSON.stringify(empty));
     const raw = fs.readFileSync(dbFile, "utf8");
     const parsed = JSON.parse(raw) as Partial<Store>;
+
+    // Migration: apply ADMIN_EMAILS to role field
+    const adminEmails = (process.env.ADMIN_EMAILS || "")
+      .toLowerCase()
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const consigners = (parsed.consigners ?? []).map((c: any) => ({
+      ...c,
+      role: c.role || (adminEmails.includes(c.email.toLowerCase()) ? "ADMIN" : "CONSIGNER"),
+    }));
+
     return {
       broadcastChannels: parsed.broadcastChannels ?? [],
       broadcastOrders: parsed.broadcastOrders ?? [],
-      consigners: parsed.consigners ?? [],
+      consigners,
       listings: parsed.listings ?? [],
       payouts: parsed.payouts ?? [],
       inventory: parsed.inventory ?? [],
@@ -167,7 +183,6 @@ function load(): Store {
 
 function save(store: Store): void {
   fs.mkdirSync(dataDir, { recursive: true });
-  // Atomic write: tmp -> rename
   const tmp = dbFile + ".tmp";
   fs.writeFileSync(tmp, JSON.stringify(store, null, 2));
   fs.renameSync(tmp, dbFile);
@@ -185,7 +200,6 @@ function now(): string {
   return new Date().toISOString().replace("T", " ").slice(0, 19);
 }
 
-// ── Consigners ───────────────────────────────────────────────
 export const consignersTable = {
   findByEmail(email: string): Consigner | undefined {
     return getStore().consigners.find(
@@ -229,7 +243,6 @@ export const consignersTable = {
   },
 };
 
-// ── Listings ─────────────────────────────────────────────────
 export const listingsTable = {
   findById(id: number): Listing | undefined {
     return getStore().listings.find((l) => l.id === id);
@@ -315,7 +328,6 @@ export const listingsTable = {
   },
 };
 
-// ── Inventory ────────────────────────────────────────────────
 export const inventoryTable = {
   listAll(): Inventory[] {
     return getStore()
@@ -350,7 +362,6 @@ export const inventoryTable = {
   },
 };
 
-// ── Payouts ──────────────────────────────────────────────────
 export const payoutsTable = {
   insert(input: {
     consigner_id: number;
@@ -393,7 +404,6 @@ export const payoutsTable = {
   },
 };
 
-// ── Product Requests ─────────────────────────────────────────
 export const productRequestsTable = {
   insert(input: Omit<ProductRequest, "id" | "created_at" | "handled_at">): ProductRequest {
     const store = getStore();
@@ -450,7 +460,6 @@ export const productRequestsTable = {
   },
 };
 
-// ── Broadcast Channels ──────────────────────────────────────────
 export const broadcastChannelsTable = {
   insert(input: Omit<BroadcastChannel, "id" | "created_at">): BroadcastChannel {
     const store = getStore();
@@ -463,23 +472,19 @@ export const broadcastChannelsTable = {
     save(store);
     return row;
   },
-
   findById(id: number): BroadcastChannel | undefined {
     return getStore().broadcastChannels.find((c) => c.id === id);
   },
-
   listActive(): BroadcastChannel[] {
     return getStore()
       .broadcastChannels.filter((c) => c.active)
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-
   listAll(): BroadcastChannel[] {
     return getStore()
       .broadcastChannels.slice()
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-
   update(id: number, input: Partial<Omit<BroadcastChannel, "id" | "created_at">>): BroadcastChannel | undefined {
     const store = getStore();
     const row = store.broadcastChannels.find((c) => c.id === id);
@@ -488,7 +493,6 @@ export const broadcastChannelsTable = {
     save(store);
     return row;
   },
-
   delete(id: number): boolean {
     const store = getStore();
     const index = store.broadcastChannels.findIndex((c) => c.id === id);
@@ -499,7 +503,6 @@ export const broadcastChannelsTable = {
   },
 };
 
-// ── Broadcast Orders ────────────────────────────────────────────
 export const broadcastOrdersTable = {
   insert(input: Omit<BroadcastOrder, "id" | "created_at">): BroadcastOrder {
     const store = getStore();
@@ -512,33 +515,27 @@ export const broadcastOrdersTable = {
     save(store);
     return row;
   },
-
   findById(id: number): BroadcastOrder | undefined {
     return getStore().broadcastOrders.find((o) => o.id === id);
   },
-
   findByClaimToken(token: string): BroadcastOrder | undefined {
     return getStore().broadcastOrders.find((o) => o.claim_token === token);
   },
-
   findPendingByLineItemId(lineItemId: string): BroadcastOrder | undefined {
     return getStore().broadcastOrders.find(
       (o) => o.line_item_id === lineItemId && o.status === "PENDING"
     );
   },
-
   listPending(): BroadcastOrder[] {
     return getStore()
       .broadcastOrders.filter((o) => o.status === "PENDING")
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-
   listAll(): BroadcastOrder[] {
     return getStore()
       .broadcastOrders.slice()
       .sort((a, b) => b.created_at.localeCompare(a.created_at));
   },
-
   update(id: number, input: Partial<Omit<BroadcastOrder, "id" | "created_at">>): BroadcastOrder | undefined {
     const store = getStore();
     const row = store.broadcastOrders.find((o) => o.id === id);

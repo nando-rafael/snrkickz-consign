@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  await createSession({ id: user.id, email: user.email, name: user.name });
-  return NextResponse.redirect(redirectTo(req, "/dashboard"), 303);
+  await createSession({ id: user.id, email: user.email, name: user.name, role: user.role });
+
+  const redirectPath = (user.role === "ADMIN" || user.role === "ORDERMANAGER") ? "/admin" : "/dashboard";
+  return NextResponse.redirect(redirectTo(req, redirectPath), 303);
 }
+

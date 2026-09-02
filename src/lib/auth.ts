@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import type { ConsignerRole } from "./db";
 
 const COOKIE = "consign_session";
 
@@ -9,7 +10,7 @@ function secret() {
   );
 }
 
-export type Session = { id: number; email: string; name: string };
+export type Session = { id: number; email: string; name: string; role: ConsignerRole };
 
 export async function createSession(s: Session) {
   const token = await new SignJWT(s)
@@ -34,6 +35,7 @@ export async function getSession(): Promise<Session | null> {
       id: payload.id as number,
       email: payload.email as string,
       name: payload.name as string,
+      role: (payload.role as ConsignerRole) || "CONSIGNER",
     };
   } catch {
     return null;
@@ -44,12 +46,15 @@ export function destroySession() {
   cookies().delete(COOKIE);
 }
 
-export function isAdmin(email: string | undefined | null): boolean {
-  if (!email) return false;
-  return (process.env.ADMIN_EMAILS || "")
-    .toLowerCase()
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .includes(email.toLowerCase());
+export function isAdmin(role: ConsignerRole | undefined | null): boolean {
+  return role === "ADMIN";
 }
+
+export function isOrderManager(role: ConsignerRole | undefined | null): boolean {
+  return role === "ORDERMANAGER";
+}
+
+export function isAdminOrOrderManager(role: ConsignerRole | undefined | null): boolean {
+  return role === "ADMIN" || role === "ORDERMANAGER";
+}
+

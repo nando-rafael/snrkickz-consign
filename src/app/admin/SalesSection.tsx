@@ -29,6 +29,7 @@ type ListingWithConsigner = Listing & {
 
 type Props = {
   initialListings: ListingWithConsigner[];
+  hideMargin?: boolean;
 };
 
 function euro(n: number): string {
@@ -38,7 +39,7 @@ function euro(n: number): string {
   })}`;
 }
 
-export default function SalesSection({ initialListings }: Props) {
+export default function SalesSection({ initialListings, hideMargin = false }: Props) {
   const router = useRouter();
   const [listings, setListings] = useState<ListingWithConsigner[]>(initialListings);
   const [uploadingId, setUploadingId] = useState<number | null>(null);
@@ -116,7 +117,6 @@ export default function SalesSection({ initialListings }: Props) {
     } finally {
       setSavingId(null);
       setUploadingId(null);
-      // Reset the file input so the same file can be re-selected if needed
       const input = fileInputRefs.current.get(listingId);
       if (input) input.value = "";
     }
@@ -235,7 +235,7 @@ export default function SalesSection({ initialListings }: Props) {
                 <th>Consigner</th>
                 <th>Verkoopprijs</th>
                 <th>Estimated Payout</th>
-                <th>Marge</th>
+                {!hideMargin && <th>Marge</th>}
                 <th>Label</th>
                 <th>Melding</th>
               </tr>
@@ -259,9 +259,7 @@ export default function SalesSection({ initialListings }: Props) {
                   </td>
                   <td>
                     <div className="prod" style={{ minWidth: 200 }}>
-                      {l.product_image && (
-                        <img src={l.product_image} alt="" />
-                      )}
+                      {l.product_image && <img src={l.product_image} alt="" />}
                       <div>
                         <div className="t">{l.product_title ?? l.sku}</div>
                         <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
@@ -277,9 +275,11 @@ export default function SalesSection({ initialListings }: Props) {
                   </td>
                   <td className="num">{euro(l.sale_price_override ?? l.sale_price)}</td>
                   <td className="num">{euro(l.payout)}</td>
-                  <td className="num">
-                    {euro((l.sale_price_override ?? l.sale_price) - l.payout)}
-                  </td>
+                  {!hideMargin && (
+                    <td className="num">
+                      {euro((l.sale_price_override ?? l.sale_price) - l.payout)}
+                    </td>
+                  )}
                   <td>{renderLabelCell(l)}</td>
                   <td>
                     <button
@@ -305,3 +305,4 @@ export default function SalesSection({ initialListings }: Props) {
     </>
   );
 }
+
