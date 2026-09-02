@@ -13,9 +13,10 @@ type ConsignerWithStats = Consigner & {
 
 type Props = {
   initialConsigners: ConsignerWithStats[];
+  isAdmin?: boolean;
 };
 
-export default function ConsignersSection({ initialConsigners }: Props) {
+export default function ConsignersSection({ initialConsigners, isAdmin = true }: Props) {
   const router = useRouter();
   const [consigners, setConsigners] = useState<ConsignerWithStats[]>(initialConsigners);
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,7 +74,9 @@ export default function ConsignersSection({ initialConsigners }: Props) {
 
   return (
     <>
-      <h2 className="section-title">Consigners ({filtered.length})</h2>
+      <h2 className="section-title">
+        {isAdmin ? "Consigners" : "Team"} ({filtered.length})
+      </h2>
 
       {successMsg && (
         <div
@@ -121,8 +124,8 @@ export default function ConsignersSection({ initialConsigners }: Props) {
         {filtered.length === 0 ? (
           <div className="empty">
             {searchQuery
-              ? "Geen consigners gevonden."
-              : "Geen consigners gevonden."}
+              ? "Geen personen gevonden."
+              : "Geen personen gevonden."}
           </div>
         ) : (
           <table>
@@ -130,13 +133,13 @@ export default function ConsignersSection({ initialConsigners }: Props) {
               <tr>
                 <th>Naam</th>
                 <th>Email</th>
-                <th>IBAN</th>
+                {isAdmin && <th>IBAN</th>}
                 <th>Discord</th>
-                <th>Webhook URL</th>
+                {isAdmin && <th>Webhook URL</th>}
                 <th>Live</th>
                 <th>Verkocht</th>
-                <th>Uitbetaling</th>
-                <th>Acties</th>
+                {isAdmin && <th>Uitbetaling</th>}
+                {isAdmin && <th>Acties</th>}
               </tr>
             </thead>
             <tbody>
@@ -146,42 +149,50 @@ export default function ConsignersSection({ initialConsigners }: Props) {
                   <td>
                     <span className="size-chip">{c.email}</span>
                   </td>
-                  <td>
-                    <span className="size-chip">{c.iban || "—"}</span>
-                  </td>
+                  {isAdmin && (
+                    <td>
+                      <span className="size-chip">{c.iban || "—"}</span>
+                    </td>
+                  )}
                   <td>
                     <span className="size-chip">
                       {c.discord_username || "—"}
                     </span>
                   </td>
-                  <td>
-                    {c.discord_webhook_url ? (
-                      <span
-                        className="size-chip"
-                        title={c.discord_webhook_url}
-                      >
-                        ✓ ingesteld
-                      </span>
-                    ) : (
-                      <span className="size-chip">—</span>
-                    )}
-                  </td>
+                  {isAdmin && (
+                    <td>
+                      {c.discord_webhook_url ? (
+                        <span
+                          className="size-chip"
+                          title={c.discord_webhook_url}
+                        >
+                          ✓ ingesteld
+                        </span>
+                      ) : (
+                        <span className="size-chip">—</span>
+                      )}
+                    </td>
+                  )}
                   <td className="num">{c.activeCount}</td>
                   <td className="num">{c.soldCount}</td>
-                  <td className="num">
-                    {c.pendingPayout > 0 ? euro(c.pendingPayout) : "—"}
-                  </td>
-                  <td>
-                    <button
-                      className="btn danger sm"
-                      type="button"
-                      disabled={loadingId === c.id}
-                      onClick={() => handleDelete(c.id, c.name)}
-                      title="Account verwijderen"
-                    >
-                      🗑️
-                    </button>
-                  </td>
+                  {isAdmin && (
+                    <td className="num">
+                      {c.pendingPayout > 0 ? euro(c.pendingPayout) : "—"}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td>
+                      <button
+                        className="btn danger sm"
+                        type="button"
+                        disabled={loadingId === c.id}
+                        onClick={() => handleDelete(c.id, c.name)}
+                        title="Account verwijderen"
+                      >
+                        🗑️
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -191,3 +202,4 @@ export default function ConsignersSection({ initialConsigners }: Props) {
     </>
   );
 }
+
