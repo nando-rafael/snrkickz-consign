@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { listingsTable, payoutsTable, consignersTable, inventoryTable, productRequestsTable, broadcastOrdersTable } from "@/lib/db";
-import { getSession, isAdmin } from "@/lib/auth";
+import { getSession, isAdmin, isAdminOrOrderManager } from "@/lib/auth";
 import { euro, feePct } from "@/lib/config";
 import InventorySection from "./InventorySection";
 import ProductRequestsSection from "./ProductRequestsSection";
@@ -9,14 +9,16 @@ import SalesSection from "./SalesSection";
 import ConsignersSection from "./ConsignersSection";
 import BroadcastOrdersSection from "./BroadcastOrdersSection";
 import BroadcastChannelsSection from "./BroadcastChannelsSection";
+import TeamSection from "./TeamSection";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!isAdmin(session.email)) redirect("/dashboard");
+  if (!isAdminOrOrderManager(session.role)) redirect("/dashboard");
 
+  const isAdminUser = isAdmin(session.role);
   const allListings = listingsTable.listAll();
 
   const listings = allListings.map((l) => {
@@ -64,60 +66,77 @@ export default async function AdminPage() {
     return { ...c, activeCount, soldCount, pendingPayout };
   });
 
+  // For Team section: only show ORDERMANAGER users
+  const ordermanagers = consigners.filter((c) => c.role === "ORDERMANAGER");
+
   return (
     <main className="page container">
       <div className="page-head">
         <div>
-          <h1 className="page-title">Admin</h1>
+          <h1 className="page-title">
+            {isAdminUser ? "Admin" : "Order Manager"}
+          </h1>
           <p className="page-sub">Fee: {feePct()}% over de verkoopprijs · laagste ask wint</p>
         </div>
       </div>
-      <div className="stats">
-        <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
-        <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
-        <div className="stat"><div className="label">Fee verdiend</div><div className="value">{euro(feeEarned)}</div></div>
-        <div className="stat"><div className="label">Uit te betalen</div><div className="value">{euro(pendingSum)}</div></div>
-      </div>
 
-      <ProductRequestsSection initialRequests={allProductRequests} />
+      {/* HIDE for ORDERMANAGER: Stats */}
+      {isAdminUser && (
+        <div className="stats">
+          <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
+          <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
+          <div className="stat"><div className="label">Fee verdiend</div><div className="value">{euro(feeEarned)}</div></div>
+          <div className="stat"><div className="label">Uit te betalen</div><div className="value">{euro(pendingSum)}</div></div>
+        </div>
+      )}
 
-      <ConsignersSection initialConsigners={consigners} />
+      <ProductRequestsSection initialRequests={allProductRequests} isAdmin={isAdminUser} />
 
-      <InventorySection initialItems={inventory} />
+      <ConsignersSection initialConsigners={consigners} isAdmin={isAdminUser} />
 
-      <BroadcastChannelsSection />
+      {isAdminUser && <InventorySection initialItems={inventory} />}
 
-      <BroadcastOrdersSection />
+      {isAdminUser && <BroadcastChannelsSection />}
 
-      <h2 className="section-title">Openstaande uitbetalingen ({pendingPayouts.length})</h2>
-      <div className="table-wrap">
-        {pendingPayouts.length === 0 ? <div className="empty">Geen openstaande uitbetalingen.</div> : (
-          <table>
-            <thead><tr><th>Datum</th><th>Consigner</th><th>IBAN</th><th>Item</th><th>Order</th><th>Bedrag</th><th></th></tr></thead>
-            <tbody>
-              {pendingPayouts.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.created_at.slice(0, 10)}</td>
-                  <td>{p.consigner_name}<div className="size-chip">{p.consigner_email}</div></td>
-                  <td><span className="size-chip">{p.iban || "—"}</span></td>
-                  <td><span className="sku">{p.sku}</span></td>
-                  <td><span className="size-chip">{p.order_name}</span></td>
-                  <td className="num">{euro(p.amount)}</td>
-                  <td>
-                    <form action={`/api/admin/payouts/${p.id}/paid`} method="post">
-                      <button className="btn sm" type="submit">Markeer uitbetaald</button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {isAdminUser && <BroadcastOrdersSection />}
 
-      <SalesSection initialListings={soldListings} />
+      {/* Team Management - ADMIN ONLY */}
+      {isAdminUser && <TeamSection initialManagers={ordermanagers} />}
 
-      <ListingsSection initialListings={active} />
+      {/* HIDE for ORDERMANAGER: Openstaande uitbetalingen */}
+      {isAdminUser && (
+        <>
+          <h2 className="section-title">Openstaande uitbetalingen ({pendingPayouts.length})</h2>
+          <div className="table-wrap">
+            {pendingPayouts.length === 0 ? <div className="empty">Geen openstaande uitbetalingen.</div> : (
+              <table>
+                <thead><tr><th>Datum</th><th>Consigner</th><th>IBAN</th><th>Item</th><th>Order</th><th>Bedrag</th><th></th></tr></thead>
+                <tbody>
+                  {pendingPayouts.map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.created_at.slice(0, 10)}</td>
+                      <td>{p.consigner_name}<div className="size-chip">{p.consigner_email}</div></td>
+                      <td><span className="size-chip">{p.iban || "—"}</span></td>
+                      <td><span className="sku">{p.sku}</span></td>
+                      <td><span className="size-chip">{p.order_name}</span></td>
+                      <td className="num">{euro(p.amount)}</td>
+                      <td>
+                        <form action={`/api/admin/payouts/${p.id}/paid`} method="post">
+                          <button className="btn sm" type="submit">Markeer uitbetaald</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      )}
+
+      <SalesSection initialListings={soldListings} isAdmin={isAdminUser} />
+
+      {isAdminUser && <ListingsSection initialListings={active} />}
     </main>
   );
 }
