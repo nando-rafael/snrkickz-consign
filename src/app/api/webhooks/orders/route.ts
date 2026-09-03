@@ -115,6 +115,13 @@ function getPayoutTime(paymentMethod: string): { method: string; time: string } 
   return { method: paymentMethod, time: "Unknown" };
 }
 
+// Helper to check if brand is broadcast-enabled
+function isBroadcastBrand(vendor: string | undefined): boolean {
+  if (!vendor) return false;
+  const normalized = vendor.toUpperCase();
+  return normalized === "ASICS" || normalized === "VANS";
+}
+
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
   const hmac = req.headers.get("x-shopify-hmac-sha256");
@@ -144,9 +151,9 @@ export async function POST(req: NextRequest) {
     const qty: number = li?.quantity || 1;
     let itemMatched = false;
     
-    // Log all line items for Asics
-    if (li.vendor?.toUpperCase() === "ASICS") {
-      console.log(`[BROADCAST] Processing Asics item: "${li.title}"`);
+    // Log all line items for broadcast brands
+    if (isBroadcastBrand(li.vendor)) {
+      console.log(`[BROADCAST] Processing ${li.vendor?.toUpperCase()} item: "${li.title}"`);
       console.log(`[BROADCAST]   variant_title: "${li.variant_title}"`);
       console.log(`[BROADCAST]   SKU: "${li.sku}"`);
       console.log(`[BROADCAST]   properties: ${JSON.stringify(li.properties)}`);
@@ -177,7 +184,7 @@ export async function POST(req: NextRequest) {
     if (!itemMatched) {
       const size = extractSize(li);
       
-      if (li.vendor?.toUpperCase() === "ASICS") {
+      if (isBroadcastBrand(li.vendor)) {
         console.log(`[BROADCAST]   extracted size: "${size}"`);
       }
 
@@ -197,28 +204,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check unmatched items against broadcast channels (Asics filter)
+  // Check unmatched items against broadcast channels (Asics & Vans)
   for (const item of unmatchedItems) {
-    // Only match Asics brand/vendor
-    if (!item.vendor || item.vendor.toUpperCase() !== "ASICS") {
+    // Only match broadcast-enabled brands (Asics, Vans)
+    if (!isBroadcastBrand(item.vendor)) {
       continue;
     }
 
-    console.log(`[BROADCAST] Processing Asics broadcast order: ${item.productTitle}`);
+    const brandName = item.vendor!.toUpperCase();
+    console.log(`[BROADCAST] Processing ${brandName} broadcast order: ${item.productTitle}`);
     console.log(`[BROADCAST]   Size for Discord: "${item.size}"`);
     console.log(`[BROADCAST]   Payout info: ${payoutInfo.method} - ${payoutInfo.time}`);
     
-    // Find Asics broadcast channel
-    const asicsChannel = broadcastChannelsTable.listAll().find((ch) => 
-      ch.brand.toUpperCase() === "ASICS" && Boolean(ch.active)
+    // Find matching broadcast channel
+    const channel = broadcastChannelsTable.listAll().find((ch) => 
+      ch.brand.toUpperCase() === brandName && Boolean(ch.active)
     );
     
-    if (!asicsChannel) {
-      console.log(`[BROADCAST] ❌ No active Asics channel found`);
+    if (!channel) {
+      console.log(`[BROADCAST] ❌ No active ${brandName} channel found`);
       continue;
     }
 
-    console.log(`[BROADCAST] ✅ Found Asics channel: ${asicsChannel.id}`);
+    console.log(`[BROADCAST] ✅ Found ${brandName} channel: ${channel.id}`);
 
     // Create broadcast order
     const claimToken = generateClaimToken();
@@ -234,13 +242,13 @@ export async function POST(req: NextRequest) {
       variant_id: item.variantId,
       product_id: item.productId,
       sale_price: item.salePrice,
-      broadcast_channel_id: asicsChannel.id,
+      broadcast_channel_id: channel.id,
       status: "PENDING",
       claimed_by_supplier_email: null,
       claimed_at: null,
       rejected_at: null,
       claim_token: claimToken,
-      payout_amount: Math.round(item.salePrice * (asicsChannel.default_payout_percentage / 100) * 100) / 100,
+      payout_amount: Math.round(item.salePrice * (channel.default_payout_percentage / 100) * 100) / 100,
       notes: null,
     });
 
@@ -251,7 +259,7 @@ export async function POST(req: NextRequest) {
     const claimUrl = `https://${publicDomain}/broadcast/claim/${broadcastOrder.id}?token=${claimToken}`;
     const rejectUrl = `https://${publicDomain}/broadcast/reject/${broadcastOrder.id}?token=${claimToken}`;
 
-    let discordMsg = `📦 **${orderName}** — Asics order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}`;
+    let discordMsg = `📦 **${orderName}** — ${brandName} order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}`;
     if (item.size) {
       discordMsg += `\n**Size:** EU ${item.size}`;
     }
@@ -259,7 +267,7 @@ export async function POST(req: NextRequest) {
     discordMsg += `\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
     
     console.log(`[BROADCAST] Posting Discord message...\n${discordMsg}`);
-    await postDiscord(asicsChannel.discord_webhook_url, discordMsg);
+    await postDiscord(channel.discord_webhook_url, discordMsg);
   }
 
   for (const v of Array.from(touchedVariants)) {
