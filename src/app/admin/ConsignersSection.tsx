@@ -253,7 +253,11 @@ export default function ConsignersSection({ initialConsigners }: Props) {
                           disabled={loadingId === c.id}
                           onClick={() => {
                             setEditingId(c.id);
-                            setEditRole(c.role || "CONSIGNER");
+                            setEditRole(
+                              c.role === "ADMIN" || c.role === "ORDERMANAGER"
+                                ? "ORDERMANAGER"
+                                : "CONSIGNER"
+                            );
                           }}
                           title="Rol wijzigen"
                         >
