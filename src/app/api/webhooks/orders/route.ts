@@ -31,95 +31,89 @@ async function postDiscord(webhookUrl: string, message: string) {
   }
 }
 
-// Helper function to extract size from line item
 function extractSize(li: any): string {
-  let size = "";
-  
-  // Method 1: Check properties array (custom fields added at checkout)
   if (li.properties && Array.isArray(li.properties)) {
-    const sizeProperty = li.properties.find((p: any) => 
+    const sizeProperty = li.properties.find((p: any) =>
       p.name?.toLowerCase() === "size" || p.name?.toLowerCase() === "taille" || p.name?.toLowerCase() === "maat"
     );
-    if (sizeProperty?.value) {
-      return sizeProperty.value.toString().trim();
-    }
+    if (sizeProperty?.value) return sizeProperty.value.toString().trim();
   }
-  
-  // Method 2: Extract from variant_title (e.g., "Kayano 14 - EU 42" or "Kayano 14 White Ivory - Size 42")
   if (li.variant_title) {
-    // Try EU size format
     let match = li.variant_title.match(/EU\s*(\d+(?:\.\d+)?)/i);
     if (match) return match[1];
-    
-    // Try "Size XX" format
     match = li.variant_title.match(/[Ss]ize[\s-]*(\d+(?:\.\d+)?)/);
     if (match) return match[1];
-    
-    // Try last numeric value in variant title (fallback)
     match = li.variant_title.match(/(\d+(?:\.\d+)?)\s*$/);
     if (match) return match[1];
   }
-  
-  // Method 3: Check SKU for size suffix (some stores put size at end)
   if (li.sku) {
     const parts = li.sku.split("-");
     const lastPart = parts[parts.length - 1];
-    if (/^\d+/.test(lastPart)) {
-      return lastPart.replace(/\D/g, "");
-    }
+    if (/^\d+/.test(lastPart)) return lastPart.replace(/\D/g, "");
   }
-  
   return "";
 }
 
-// Helper function to extract payment method from order
 function extractPaymentMethod(order: any): string {
-  // Method 1: Check payment_gateway_names (most reliable)
   if (order.payment_gateway_names && Array.isArray(order.payment_gateway_names)) {
-    if (order.payment_gateway_names.length > 0) {
-      return order.payment_gateway_names[0];
-    }
+    if (order.payment_gateway_names.length > 0) return order.payment_gateway_names[0];
   }
-  
-  // Method 2: Check transactions array
   if (order.transactions && Array.isArray(order.transactions)) {
     const successfulTx = order.transactions.find((tx: any) => tx.status === "success");
-    if (successfulTx?.gateway) {
-      return successfulTx.gateway;
-    }
+    if (successfulTx?.gateway) return successfulTx.gateway;
   }
-  
-  // Method 3: Fallback to gateway
-  if (order.gateway) {
-    return order.gateway;
-  }
-  
+  if (order.gateway) return order.gateway;
   return "Unknown";
 }
 
-// Payout time mapping based on payment method
 function getPayoutTime(paymentMethod: string): { method: string; time: string } {
   const normalized = paymentMethod.toLowerCase().trim();
-  
-  if (normalized.includes("ideal")) {
-    return { method: "iDEAL", time: "48H" };
-  }
-  if (normalized.includes("revolut")) {
-    return { method: "Revolut", time: "24H" };
-  }
-  if (normalized.includes("klarna")) {
-    return { method: "Klarna", time: "9 Days" };
-  }
-  
-  // Default fallback
+  if (normalized.includes("ideal")) return { method: "iDEAL", time: "48H" };
+  if (normalized.includes("revolut")) return { method: "Revolut", time: "24H" };
+  if (normalized.includes("klarna")) return { method: "Klarna", time: "9 Days" };
   return { method: paymentMethod, time: "Unknown" };
 }
 
-// Helper to check if brand is broadcast-enabled
-function isBroadcastBrand(vendor: string | undefined): boolean {
-  if (!vendor) return false;
-  const normalized = vendor.toUpperCase();
-  return normalized === "ASICS" || normalized === "VANS";
+// Find matching broadcast channel for a line item based on active channels in database
+// Supports match types: VENDOR, TITLE_CONTAINS, TAG
+function findMatchingChannel(li: any): any | null {
+  const allChannels = broadcastChannelsTable.listAll();
+  const activeChannels = allChannels.filter((ch: any) => Boolean(ch.active));
+
+  console.log(`[BROADCAST] Checking ${activeChannels.length} active channels for line item: "${li.title}" (vendor: "${li.vendor}")`);
+
+  for (const ch of activeChannels) {
+    const matchType = (ch.match_type || "VENDOR").toUpperCase();
+    const matchValue = (ch.match_value || ch.brand || "").trim().toUpperCase();
+
+    if (!matchValue) {
+      console.log(`[BROADCAST]   Channel "${ch.brand}" skipped: no match_value`);
+      continue;
+    }
+
+    let isMatch = false;
+    let checkedValue = "";
+
+    if (matchType === "VENDOR") {
+      checkedValue = (li.vendor || "").trim().toUpperCase();
+      isMatch = checkedValue === matchValue;
+    } else if (matchType === "TITLE_CONTAINS" || matchType === "TITLE" || matchType === "TITEL_BEVAT") {
+      checkedValue = (li.title || "").trim().toUpperCase();
+      isMatch = checkedValue.includes(matchValue);
+    } else if (matchType === "TAG") {
+      const tags = Array.isArray(li.tags) ? li.tags : (li.tags || "").split(",");
+      checkedValue = tags.join(",").toUpperCase();
+      isMatch = tags.some((t: string) => t.trim().toUpperCase() === matchValue);
+    }
+
+    console.log(`[BROADCAST]   Channel "${ch.brand}" (${matchType}="${matchValue}"): checking against "${checkedValue}" → match=${isMatch}`);
+
+    if (isMatch) {
+      return ch;
+    }
+  }
+
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -128,7 +122,6 @@ export async function POST(req: NextRequest) {
   if (!verifyHmac(rawBody, hmac)) {
     return NextResponse.json({ error: "Ongeldige HMAC" }, { status: 401 });
   }
-
   let order: any;
   try { order = JSON.parse(rawBody); }
   catch { return NextResponse.json({ error: "Ongeldige payload" }, { status: 400 }); }
@@ -137,7 +130,6 @@ export async function POST(req: NextRequest) {
   const paymentMethod = extractPaymentMethod(order);
   const payoutInfo = getPayoutTime(paymentMethod);
   const lineItems: any[] = order?.line_items || [];
-
   console.log(`[ORDER] ${orderName} - Payment method: ${paymentMethod}, Payout time: ${payoutInfo.time}`);
 
   let matched = 0;
@@ -150,15 +142,9 @@ export async function POST(req: NextRequest) {
     const variantGid = `gid://shopify/ProductVariant/${li.variant_id}`;
     const qty: number = li?.quantity || 1;
     let itemMatched = false;
-    
-    // Log all line items for broadcast brands
-    if (isBroadcastBrand(li.vendor)) {
-      console.log(`[BROADCAST] Processing ${li.vendor?.toUpperCase()} item: "${li.title}"`);
-      console.log(`[BROADCAST]   variant_title: "${li.variant_title}"`);
-      console.log(`[BROADCAST]   SKU: "${li.sku}"`);
-      console.log(`[BROADCAST]   properties: ${JSON.stringify(li.properties)}`);
-    }
-    
+
+    console.log(`[LINE] "${li.title}" vendor="${li.vendor}" sku="${li.sku}" variant="${li.variant_title}"`);
+
     for (let i = 0; i < qty; i++) {
       const listing = listingsTable.findActiveByVariantLowestPayout(variantGid);
       if (!listing) break;
@@ -172,28 +158,18 @@ export async function POST(req: NextRequest) {
       touchedVariants.add(variantGid);
       matched++;
       itemMatched = true;
-      
-      discordNotifications.push({
-        consignerId: listing.consigner_id,
-        listing,
-        orderName,
-      });
+      discordNotifications.push({ consignerId: listing.consigner_id, listing, orderName });
     }
 
-    // Track unmatched items for broadcast
     if (!itemMatched) {
       const size = extractSize(li);
-      
-      if (isBroadcastBrand(li.vendor)) {
-        console.log(`[BROADCAST]   extracted size: "${size}"`);
-      }
-
       unmatchedItems.push({
         lineItemId: li.id,
         variantId: li.variant_id,
         productId: li.product_id,
         productTitle: li.title,
         vendor: li.vendor,
+        tags: li.tags,
         sku: li.sku,
         size: size,
         quantity: qty,
@@ -204,31 +180,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Check unmatched items against broadcast channels (Asics & Vans)
+  // Check unmatched items against ALL configured broadcast channels
   for (const item of unmatchedItems) {
-    // Only match broadcast-enabled brands (Asics, Vans)
-    if (!isBroadcastBrand(item.vendor)) {
-      continue;
-    }
+    const channel = findMatchingChannel(item);
 
-    const brandName = item.vendor!.toUpperCase();
-    console.log(`[BROADCAST] Processing ${brandName} broadcast order: ${item.productTitle}`);
-    console.log(`[BROADCAST]   Size for Discord: "${item.size}"`);
-    console.log(`[BROADCAST]   Payout info: ${payoutInfo.method} - ${payoutInfo.time}`);
-    
-    // Find matching broadcast channel
-    const channel = broadcastChannelsTable.listAll().find((ch) => 
-      ch.brand.toUpperCase() === brandName && Boolean(ch.active)
-    );
-    
     if (!channel) {
-      console.log(`[BROADCAST] ❌ No active ${brandName} channel found`);
+      console.log(`[BROADCAST] ❌ No matching channel for "${item.productTitle}" (vendor: "${item.vendor}")`);
       continue;
     }
 
-    console.log(`[BROADCAST] ✅ Found ${brandName} channel: ${channel.id}`);
+    console.log(`[BROADCAST] ✅ Matched channel "${channel.brand}" (id ${channel.id}) for "${item.productTitle}"`);
 
-    // Create broadcast order
     const claimToken = generateClaimToken();
     const broadcastOrder = broadcastOrdersTable.insert({
       shopify_order_id: order.id?.toString() || "",
@@ -251,22 +213,19 @@ export async function POST(req: NextRequest) {
       payout_amount: Math.round(item.salePrice * (channel.default_payout_percentage / 100) * 100) / 100,
       notes: null,
     });
-
     console.log(`[BROADCAST] Created broadcast order #${broadcastOrder.id}`);
 
-    // Build Discord message
     const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN || "vibrant-motivation-production-a8c5.up.railway.app";
     const claimUrl = `https://${publicDomain}/broadcast/claim/${broadcastOrder.id}?token=${claimToken}`;
     const rejectUrl = `https://${publicDomain}/broadcast/reject/${broadcastOrder.id}?token=${claimToken}`;
 
-    let discordMsg = `📦 **${orderName}** — ${brandName} order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}`;
-    if (item.size) {
-      discordMsg += `\n**Size:** EU ${item.size}`;
-    }
+    const brandLabel = (channel.brand || "").toUpperCase();
+    let discordMsg = `📦 **${orderName}** — ${brandLabel} order\n\n**Product:** ${item.productTitle}\n**SKU:** ${item.sku}`;
+    if (item.size) discordMsg += `\n**Size:** EU ${item.size}`;
     discordMsg += `\n**Payment method:** ${payoutInfo.method}\n**Payout time:** ${payoutInfo.time}`;
     discordMsg += `\n\n✅ [CLAIM ORDER](${claimUrl})\n❌ [Can't fulfill](${rejectUrl})\n\nYou have 48 hours to claim.`;
-    
-    console.log(`[BROADCAST] Posting Discord message...\n${discordMsg}`);
+
+    console.log(`[BROADCAST] Posting Discord message to channel ${channel.id}`);
     await postDiscord(channel.discord_webhook_url, discordMsg);
   }
 
@@ -275,7 +234,6 @@ export async function POST(req: NextRequest) {
     catch (e) { console.error(`Prijsherstel mislukt voor ${v}:`, e); }
   }
 
-  // Send Discord notifications to consigners
   for (const notif of discordNotifications) {
     const consigner = consignersTable.findById(notif.consignerId);
     if (consigner?.discord_webhook_url) {
@@ -291,4 +249,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, matched, broadcast: unmatchedItems.length });
 }
-
