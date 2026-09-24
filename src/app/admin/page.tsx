@@ -124,7 +124,7 @@ export default async function AdminPage({
         </div>
       </div>
 
-      {isAdminUser && (
+           {isAdminUser && (
         <div className="stats">
           <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
           <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
