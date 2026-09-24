@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { listingsTable, payoutsTable, consignersTable, inventoryTable, productRequestsTable, broadcastOrdersTable } from "@/lib/db";
+import { listingsTable, payoutsTable, consignersTable, inventoryTable, productRequestsTable } from "@/lib/db";
 import { getSession, isAdmin, isAdminOrOrderManager } from "@/lib/auth";
 import { euro, feePct } from "@/lib/config";
 import InventorySection from "./InventorySection";
@@ -23,6 +23,9 @@ type TabKey =
   | "inventory"
   | "broadcast"
   | "team";
+
+type TabDef = { key: TabKey; label: string; badge?: number };
+type CardDef = { key: TabKey; label: string; value: string };
 
 export default async function AdminPage({
   searchParams,
@@ -64,10 +67,12 @@ export default async function AdminPage({
 
   const active = listings.filter((l) => l.status === "ACTIVE");
   const sold = listings.filter((l) => l.status === "SOLD");
+
   const soldListings = sold.sort((a, b) => {
     if (!a.sold_at || !b.sold_at) return 0;
     return b.sold_at.localeCompare(a.sold_at);
   });
+
   const pendingPayouts = payouts.filter((p) => p.status === "PENDING");
   const pendingSum = pendingPayouts.reduce((s, p) => s + p.amount, 0);
   const feeEarned = sold.reduce((s, l) => s + (l.sale_price - l.payout), 0);
@@ -84,36 +89,43 @@ export default async function AdminPage({
 
   const ordermanagers = consigners.filter((c) => c.role === "ORDERMANAGER");
 
-  // Open = alles wat nog een actie nodig heeft
   const openRequests = allProductRequests.filter((r) => {
     const s = String((r as any).status || "").toUpperCase();
     return s !== "LIVE" && s !== "REJECTED" && s !== "AFGEWEZEN";
   }).length;
 
-  // ── Tabs ────────────────────────────────────────────────
-  const tabs: { key: TabKey; label: string; badge?: number }[] = [
-    { key: "overzicht", label: "Overzicht" },
-    { key: "verkopen", label: "Verkopen" },
-    ...(isAdminUser ? [{ key: "listings" as TabKey, label: "Listings" }] : []),
-    ...(isAdminUser ? [{ key: "uitbetalingen" as TabKey, label: "Uitbetalingen", badge: pendingPayouts.length }] : []),
-    { key: "consigners", label: "Consigners" },
-    { key: "requests", label: "Requests", badge: openRequests },
-    ...(isAdminUser ? [{ key: "inventory" as TabKey, label: "Inventory" }] : []),
-    ...(isAdminUser ? [{ key: "broadcast" as TabKey, label: "Broadcast" }] : []),
-    ...(isAdminUser ? [{ key: "team" as TabKey, label: "Team" }] : []),
-  ];
+  const tabs: TabDef[] = [{ key: "overzicht", label: "Overzicht" }, { key: "verkopen", label: "Verkopen" }];
+
+  if (isAdminUser) {
+    tabs.push({ key: "listings", label: "Listings" });
+    tabs.push({ key: "uitbetalingen", label: "Uitbetalingen", badge: pendingPayouts.length });
+  }
+
+  tabs.push({ key: "consigners", label: "Consigners" });
+  tabs.push({ key: "requests", label: "Requests", badge: openRequests });
+
+  if (isAdminUser) {
+    tabs.push({ key: "inventory", label: "Inventory" });
+    tabs.push({ key: "broadcast", label: "Broadcast" });
+    tabs.push({ key: "team", label: "Team" });
+  }
 
   const requested = (searchParams?.tab || "overzicht") as TabKey;
   const tab: TabKey = tabs.some((t) => t.key === requested) ? requested : "overzicht";
 
-  const overviewCards = [
-    { key: "verkopen", label: "Verkopen", value: String(sold.length) },
-    ...(isAdminUser ? [{ key: "listings", label: "Live listings", value: String(active.length) }] : []),
-    ...(isAdminUser ? [{ key: "uitbetalingen", label: "Openstaande uitbetalingen", value: String(pendingPayouts.length) }] : []),
-    { key: "requests", label: "Open requests", value: String(openRequests) },
-    { key: "consigners", label: "Consigners", value: String(consigners.length) },
-    ...(isAdminUser ? [{ key: "inventory", label: "Inventory", value: String(inventory.length) }] : []),
-  ];
+  const overviewCards: CardDef[] = [{ key: "verkopen", label: "Verkopen", value: String(sold.length) }];
+
+  if (isAdminUser) {
+    overviewCards.push({ key: "listings", label: "Live listings", value: String(active.length) });
+    overviewCards.push({ key: "uitbetalingen", label: "Openstaande uitbetalingen", value: String(pendingPayouts.length) });
+  }
+
+  overviewCards.push({ key: "requests", label: "Open requests", value: String(openRequests) });
+  overviewCards.push({ key: "consigners", label: "Consigners", value: String(consigners.length) });
+
+  if (isAdminUser) {
+    overviewCards.push({ key: "inventory", label: "Inventory", value: String(inventory.length) });
+  }
 
   return (
     <main className="page container">
@@ -124,12 +136,24 @@ export default async function AdminPage({
         </div>
       </div>
 
-           {isAdminUser && (
+      {isAdminUser && (
         <div className="stats">
-          <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
-          <div className="stat"><div className="label">Verkocht</div><div className="value">{sold.length}</div></div>
-          <div className="stat"><div className="label">Fee verdiend</div><div className="value">{euro(feeEarned)}</div></div>
-          <div className="stat"><div className="label">Uit te betalen</div><div className="value">{euro(pendingSum)}</div></div>
+          <div className="stat">
+            <div className="label">Live listings</div>
+            <div className="value">{active.length}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Verkocht</div>
+            <div className="value">{sold.length}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Fee verdiend</div>
+            <div className="value">{euro(feeEarned)}</div>
+          </div>
+          <div className="stat">
+            <div className="label">Uit te betalen</div>
+            <div className="value">{euro(pendingSum)}</div>
+          </div>
         </div>
       )}
 
@@ -137,90 +161,113 @@ export default async function AdminPage({
         style={{
           display: "flex",
           gap: 2,
-          borderBottom: "1px solid var(--line, #262622)",
+          borderBottom: "1px solid #262622",
           marginBottom: 20,
           overflowX: "auto",
         }}
       >
-        {tabs.map((t) => {
-          const isActive = t.key === tab;
-          return (
-            
-              key={t.key}
-              href={`/admin?tab=${t.key}`}
-              style={{
-                padding: "10px 15px",
-                fontSize: 13.5,
-                whiteSpace: "nowrap",
-                textDecoration: "none",
-                color: isActive ? "var(--text, #f2f0ea)" : "var(--muted, #8f8b80)",
-                borderBottom: isActive ? "2px solid var(--accent, #ff5f1f)" : "2px solid transparent",
-                marginBottom: -1,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              {t.label}
-              {typeof t.badge === "number" && t.badge > 0 && (
-                <span
-                  style={{
-                    background: "var(--accent, #ff5f1f)",
-                    color: "#0c0c0b",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "1px 7px",
-                    borderRadius: 999,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {t.badge}
-                </span>
-              )}
-            </a>
-          );
-        })}
+        {tabs.map((t) => (
+          
+            key={t.key}
+            href={`/admin?tab=${t.key}`}
+            style={{
+              padding: "10px 15px",
+              fontSize: 13.5,
+              whiteSpace: "nowrap",
+              textDecoration: "none",
+              color: t.key === tab ? "#f2f0ea" : "#8f8b80",
+              borderBottom: t.key === tab ? "2px solid #ff5f1f" : "2px solid transparent",
+              marginBottom: -1,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {t.label}
+            {t.badge !== undefined && t.badge > 0 && (
+              <span
+                style={{
+                  background: "#ff5f1f",
+                  color: "#0c0c0b",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "1px 7px",
+                  borderRadius: 999,
+                  lineHeight: 1.5,
+                }}
+              >
+                {t.badge}
+              </span>
+            )}
+          </a>
+        ))}
       </nav>
 
       {tab === "overzicht" && (
-        <>
+        <div>
           <h2 className="section-title">Snel naar</h2>
           <div className="stats">
             {overviewCards.map((c) => (
-              <a key={c.key} href={`/admin?tab=${c.key}`} className="stat" style={{ textDecoration: "none", display: "block" }}>
+              
+                key={c.key}
+                href={`/admin?tab=${c.key}`}
+                className="stat"
+                style={{ textDecoration: "none", display: "block" }}
+              >
                 <div className="label">{c.label}</div>
                 <div className="value">{c.value}</div>
               </a>
             ))}
           </div>
-        </>
+        </div>
       )}
 
-      {tab === "verkopen" && (
-        <SalesSection initialListings={soldListings} hideMargin={!isAdminUser} />
-      )}
+      {tab === "verkopen" && <SalesSection initialListings={soldListings} hideMargin={!isAdminUser} />}
 
       {tab === "listings" && isAdminUser && <ListingsSection initialListings={active} />}
 
       {tab === "uitbetalingen" && isAdminUser && (
-        <>
+        <div>
           <h2 className="section-title">Openstaande uitbetalingen ({pendingPayouts.length})</h2>
           <div className="table-wrap">
-            {pendingPayouts.length === 0 ? <div className="empty">Geen openstaande uitbetalingen.</div> : (
+            {pendingPayouts.length === 0 ? (
+              <div className="empty">Geen openstaande uitbetalingen.</div>
+            ) : (
               <table>
-                <thead><tr><th>Datum</th><th>Consigner</th><th>IBAN</th><th>Item</th><th>Order</th><th>Bedrag</th><th></th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Datum</th>
+                    <th>Consigner</th>
+                    <th>IBAN</th>
+                    <th>Item</th>
+                    <th>Order</th>
+                    <th>Bedrag</th>
+                    <th></th>
+                  </tr>
+                </thead>
                 <tbody>
                   {pendingPayouts.map((p) => (
                     <tr key={p.id}>
                       <td>{p.created_at.slice(0, 10)}</td>
-                      <td>{p.consigner_name}<div className="size-chip">{p.consigner_email}</div></td>
-                      <td><span className="size-chip">{p.iban || "—"}</span></td>
-                      <td><span className="sku">{p.sku}</span></td>
-                      <td><span className="size-chip">{p.order_name}</span></td>
+                      <td>
+                        {p.consigner_name}
+                        <div className="size-chip">{p.consigner_email}</div>
+                      </td>
+                      <td>
+                        <span className="size-chip">{p.iban || "—"}</span>
+                      </td>
+                      <td>
+                        <span className="sku">{p.sku}</span>
+                      </td>
+                      <td>
+                        <span className="size-chip">{p.order_name}</span>
+                      </td>
                       <td className="num">{euro(p.amount)}</td>
                       <td>
                         <form action={`/api/admin/payouts/${p.id}/paid`} method="post">
-                          <button className="btn sm" type="submit">Markeer uitbetaald</button>
+                          <button className="btn sm" type="submit">
+                            Markeer uitbetaald
+                          </button>
                         </form>
                       </td>
                     </tr>
@@ -229,24 +276,20 @@ export default async function AdminPage({
               </table>
             )}
           </div>
-        </>
+        </div>
       )}
 
-      {tab === "consigners" && (
-        <ConsignersSection initialConsigners={consigners} hideMargin={!isAdminUser} />
-      )}
+      {tab === "consigners" && <ConsignersSection initialConsigners={consigners} hideMargin={!isAdminUser} />}
 
-      {tab === "requests" && (
-        <ProductRequestsSection initialRequests={allProductRequests} hideMargin={!isAdminUser} />
-      )}
+      {tab === "requests" && <ProductRequestsSection initialRequests={allProductRequests} hideMargin={!isAdminUser} />}
 
       {tab === "inventory" && isAdminUser && <InventorySection initialItems={inventory} />}
 
       {tab === "broadcast" && isAdminUser && (
-        <>
+        <div>
           <BroadcastChannelsSection />
           <BroadcastOrdersSection />
-        </>
+        </div>
       )}
 
       {tab === "team" && isAdminUser && <TeamSection initialManagers={ordermanagers} />}
