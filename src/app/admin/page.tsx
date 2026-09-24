@@ -13,7 +13,22 @@ import TeamSection from "./TeamSection";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPage() {
+type TabKey =
+  | "overzicht"
+  | "verkopen"
+  | "listings"
+  | "uitbetalingen"
+  | "consigners"
+  | "requests"
+  | "inventory"
+  | "broadcast"
+  | "team";
+
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: { tab?: string };
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (!isAdminOrOrderManager(session.role)) redirect("/dashboard");
@@ -67,21 +82,48 @@ export default async function AdminPage() {
     return { ...c, activeCount, soldCount, pendingPayout };
   });
 
-  // For Team section: only show ORDERMANAGER users
   const ordermanagers = consigners.filter((c) => c.role === "ORDERMANAGER");
+
+  // Open = alles wat nog een actie nodig heeft
+  const openRequests = allProductRequests.filter((r) => {
+    const s = String((r as any).status || "").toUpperCase();
+    return s !== "LIVE" && s !== "REJECTED" && s !== "AFGEWEZEN";
+  }).length;
+
+  // ── Tabs ────────────────────────────────────────────────
+  const tabs: { key: TabKey; label: string; badge?: number }[] = [
+    { key: "overzicht", label: "Overzicht" },
+    { key: "verkopen", label: "Verkopen" },
+    ...(isAdminUser ? [{ key: "listings" as TabKey, label: "Listings" }] : []),
+    ...(isAdminUser ? [{ key: "uitbetalingen" as TabKey, label: "Uitbetalingen", badge: pendingPayouts.length }] : []),
+    { key: "consigners", label: "Consigners" },
+    { key: "requests", label: "Requests", badge: openRequests },
+    ...(isAdminUser ? [{ key: "inventory" as TabKey, label: "Inventory" }] : []),
+    ...(isAdminUser ? [{ key: "broadcast" as TabKey, label: "Broadcast" }] : []),
+    ...(isAdminUser ? [{ key: "team" as TabKey, label: "Team" }] : []),
+  ];
+
+  const requested = (searchParams?.tab || "overzicht") as TabKey;
+  const tab: TabKey = tabs.some((t) => t.key === requested) ? requested : "overzicht";
+
+  const overviewCards = [
+    { key: "verkopen", label: "Verkopen", value: String(sold.length) },
+    ...(isAdminUser ? [{ key: "listings", label: "Live listings", value: String(active.length) }] : []),
+    ...(isAdminUser ? [{ key: "uitbetalingen", label: "Openstaande uitbetalingen", value: String(pendingPayouts.length) }] : []),
+    { key: "requests", label: "Open requests", value: String(openRequests) },
+    { key: "consigners", label: "Consigners", value: String(consigners.length) },
+    ...(isAdminUser ? [{ key: "inventory", label: "Inventory", value: String(inventory.length) }] : []),
+  ];
 
   return (
     <main className="page container">
       <div className="page-head">
         <div>
-          <h1 className="page-title">
-            {isAdminUser ? "Admin" : "Order Manager"}
-          </h1>
+          <h1 className="page-title">{isAdminUser ? "Admin" : "Order Manager"}</h1>
           <p className="page-sub">Fee: {feePct()}% over de verkoopprijs · laagste ask wint</p>
         </div>
       </div>
 
-      {/* HIDE for ORDERMANAGER: Stats */}
       {isAdminUser && (
         <div className="stats">
           <div className="stat"><div className="label">Live listings</div><div className="value">{active.length}</div></div>
@@ -91,21 +133,76 @@ export default async function AdminPage() {
         </div>
       )}
 
-      <ProductRequestsSection initialRequests={allProductRequests} hideMargin={!isAdminUser} />
+      <nav
+        style={{
+          display: "flex",
+          gap: 2,
+          borderBottom: "1px solid var(--line, #262622)",
+          marginBottom: 20,
+          overflowX: "auto",
+        }}
+      >
+        {tabs.map((t) => {
+          const isActive = t.key === tab;
+          return (
+            
+              key={t.key}
+              href={`/admin?tab=${t.key}`}
+              style={{
+                padding: "10px 15px",
+                fontSize: 13.5,
+                whiteSpace: "nowrap",
+                textDecoration: "none",
+                color: isActive ? "var(--text, #f2f0ea)" : "var(--muted, #8f8b80)",
+                borderBottom: isActive ? "2px solid var(--accent, #ff5f1f)" : "2px solid transparent",
+                marginBottom: -1,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {t.label}
+              {typeof t.badge === "number" && t.badge > 0 && (
+                <span
+                  style={{
+                    background: "var(--accent, #ff5f1f)",
+                    color: "#0c0c0b",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "1px 7px",
+                    borderRadius: 999,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {t.badge}
+                </span>
+              )}
+            </a>
+          );
+        })}
+      </nav>
 
-      <ConsignersSection initialConsigners={consigners} hideMargin={!isAdminUser} />
+      {tab === "overzicht" && (
+        <>
+          <h2 className="section-title">Snel naar</h2>
+          <div className="stats">
+            {overviewCards.map((c) => (
+              <a key={c.key} href={`/admin?tab=${c.key}`} className="stat" style={{ textDecoration: "none", display: "block" }}>
+                <div className="label">{c.label}</div>
+                <div className="value">{c.value}</div>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
 
-      {isAdminUser && <InventorySection initialItems={inventory} />}
+      {tab === "verkopen" && (
+        <SalesSection initialListings={soldListings} hideMargin={!isAdminUser} />
+      )}
 
-      {isAdminUser && <BroadcastChannelsSection />}
+      {tab === "listings" && isAdminUser && <ListingsSection initialListings={active} />}
 
-      {isAdminUser && <BroadcastOrdersSection />}
-
-      {/* Team Management - ADMIN ONLY */}
-      {isAdminUser && <TeamSection initialManagers={ordermanagers} />}
-
-      {/* HIDE for ORDERMANAGER: Openstaande uitbetalingen */}
-      {isAdminUser && (
+      {tab === "uitbetalingen" && isAdminUser && (
         <>
           <h2 className="section-title">Openstaande uitbetalingen ({pendingPayouts.length})</h2>
           <div className="table-wrap">
@@ -135,10 +232,24 @@ export default async function AdminPage() {
         </>
       )}
 
-      <SalesSection initialListings={soldListings} hideMargin={!isAdminUser} />
+      {tab === "consigners" && (
+        <ConsignersSection initialConsigners={consigners} hideMargin={!isAdminUser} />
+      )}
 
-      {isAdminUser && <ListingsSection initialListings={active} />}
+      {tab === "requests" && (
+        <ProductRequestsSection initialRequests={allProductRequests} hideMargin={!isAdminUser} />
+      )}
+
+      {tab === "inventory" && isAdminUser && <InventorySection initialItems={inventory} />}
+
+      {tab === "broadcast" && isAdminUser && (
+        <>
+          <BroadcastChannelsSection />
+          <BroadcastOrdersSection />
+        </>
+      )}
+
+      {tab === "team" && isAdminUser && <TeamSection initialManagers={ordermanagers} />}
     </main>
   );
 }
-
